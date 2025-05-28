@@ -1,0 +1,258 @@
+/* Google Font Link */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700&display=swap');
+
+/* Reset only for login page elements */
+.login-page * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Poppins", sans-serif;
+}
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #F2F0D8;
+  padding: 30px;
+}
+
+.login-container {
+  position: relative;
+  height: 600px;
+  max-width: 950px;
+  width: 100%;
+  background: #fff;
+  padding: 40px 30px;
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+  perspective: 2700px;
+}
+
+.login-container .login-cover {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 100%;
+  width: 50%;
+  z-index: 98;
+  transition: all 1s ease;
+  transform-origin: left;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+
+.login-container #login-flip:checked ~ .login-cover {
+  transform: rotateY(-180deg);
+}
+
+.login-container #login-flip:checked ~ .login-forms .login-form {
+  pointer-events: none;
+}
+
+.login-container .login-cover .login-front,
+.login-container .login-cover .login-back {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.login-cover .login-back {
+  transform: rotateY(180deg);
+}
+
+.login-container .login-cover img {
+  position: absolute;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  z-index: 10;
+}
+
+.login-container .login-cover .login-text {
+  position: absolute;
+  z-index: 10;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-container .login-cover .login-text::before {
+  content: '';
+  position: absolute;
+  height: 100%;
+  width: 100%;
+  opacity: 0.5;
+  background: #DAA06D;
+}
+
+.login-cover .login-text .login-text-1,
+.login-cover .login-text .login-text-2 {
+  z-index: 20;
+  font-size: 26px;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+}
+
+.login-cover .login-text .login-text-2 {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.login-container .login-forms {
+  height: 100%;
+  width: 100%;
+  background: #fff;
+}
+
+.login-container .login-form-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 65px;
+}
+
+.login-form-content .login-form,
+.login-form-content .login-signup-form {
+  width: calc(100% / 2 - 25px);
+}
+
+.login-forms .login-form-content .login-title {
+  position: relative;
+  font-size: 24px;
+  font-weight: 500;
+  color: #DAA06D;
+}
+
+.login-forms .login-form-content .login-title:before {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 25px;
+  background: #DAA06D;
+}
+
+.login-forms .login-signup-form .login-title:before {
+  width: 20px;
+}
+
+.login-forms .login-form-content .login-input-boxes {
+  margin-top: 30px;
+}
+
+.login-forms .login-form-content .login-input-box {
+  display: flex;
+  align-items: center;
+  height: 50px;
+  width: 100%;
+  margin: 10px 0;
+  position: relative;
+}
+
+.login-form-content .login-input-box input {
+  height: 100%;
+  width: 100%;
+  outline: none;
+  border: none;
+  padding: 0 30px;
+  font-size: 16px;
+  font-weight: 500;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.login-form-content .login-input-box input:focus,
+.login-form-content .login-input-box input:valid {
+  border-color: #DAA06D;
+}
+
+.login-form-content .login-input-box i {
+  position: absolute;
+  color: #C3CDDC;
+  font-size: 17px;
+}
+
+.login-forms .login-form-content .login-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.login-forms .login-form-content .login-text a {
+  text-decoration: none;
+  
+  color: #988558;
+}
+
+.login-forms .login-form-content .login-text a:hover {
+  text-decoration: underline;
+  color:#722F37;
+}
+
+.login-forms .login-form-content .login-button {
+  color: #fff;
+  margin-top: 40px;
+}
+
+.login-forms .login-form-content .login-button input {
+  color: #fff;
+  background: #DAA06D;
+  border-radius: 6px;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.4s ease;
+}
+
+.login-forms .login-form-content .login-button input:hover {
+  background: #DAA06D;
+}
+
+.login-forms .login-form-content label {
+  color: #DAA06D;
+  cursor: pointer;
+}
+
+.login-forms .login-form-content label:hover {
+  text-decoration: underline;
+}
+
+.login-forms .login-form-content .login-text,
+.login-forms .login-form-content .login-sign-up-text {
+  text-align: center;
+  margin-top: 25px;
+}
+
+.login-container #login-flip {
+  display: none;
+}
+
+@media (max-width: 730px) {
+  .login-container .login-cover {
+    display: none;
+  }
+
+  .login-form-content .login-form,
+  .login-form-content .login-signup-form {
+    width: 100%;
+  }
+
+  .login-form-content .login-signup-form {
+    display: none;
+  }
+
+  .login-container #login-flip:checked ~ .login-forms .login-signup-form {
+    display: block;
+  }
+
+  .login-container #login-flip:checked ~ .login-forms .login-form {
+    display: none;
+  }
+}
