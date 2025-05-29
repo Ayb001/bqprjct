@@ -6,7 +6,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -55,8 +55,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint,
-                                           JwtRequestFilter jwtRequestFilter) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authz -> authz
@@ -65,11 +64,11 @@ public class SecurityConfig {
                         .requestMatchers("/h2-console/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .headers(headers -> headers.frameOptions().disable()); // For H2 Console
+                .headers(headers -> headers.frameOptions().sameOrigin()); // Fixed for H2 Console
 
-        http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(jwtRequestFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -97,11 +96,13 @@ public class SecurityConfig {
     }
 
     @Component
-    @RequiredArgsConstructor
     public static class JwtRequestFilter extends OncePerRequestFilter {
 
-        private final UserService userService;
-        private final JwtUtil jwtUtil;
+        @Autowired
+        private UserService userService;
+
+        @Autowired
+        private JwtUtil jwtUtil;
 
         @Override
         protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
