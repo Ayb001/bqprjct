@@ -93,4 +93,63 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     // Projets par province
     Page<Project> findByStatusAndProvince(ProjectStatus status, String province, Pageable pageable);
-}
+
+    // Projets par secteur
+    @Query("SELECT p FROM Project p WHERE p.status = :status AND p.sector.name = :sectorName")
+    Page<Project> findByStatusAndSectorName(@Param("status") ProjectStatus status,
+                                            @Param("sectorName") String sectorName,
+                                            Pageable pageable);
+
+    // Recherche avancée avec tous les critères
+    @Query("SELECT DISTINCT p FROM Project p " +
+            "LEFT JOIN p.sector s " +
+            "WHERE (:status IS NULL OR p.status = :status) " +
+            "AND (:searchTerm IS NULL OR :searchTerm = '' OR " +
+            "     LOWER(p.title) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "     LOWER(p.description) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "     LOWER(p.location) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) " +
+            "AND (:province IS NULL OR :province = '' OR p.province = :province) " +
+            "AND (:sectorName IS NULL OR :sectorName = '' OR s.name = :sectorName) " +
+            "AND (:minBudget IS NULL OR p.budget >= :minBudget) " +
+            "AND (:maxBudget IS NULL OR p.budget <= :maxBudget)")
+    Page<Project> findProjectsWithAdvancedFilters(
+            @Param("status") ProjectStatus status,
+            @Param("searchTerm") String searchTerm,
+            @Param("province") String province,
+            @Param("sectorName") String sectorName,
+            @Param("minBudget") BigDecimal minBudget,
+            @Param("maxBudget") BigDecimal maxBudget,
+            Pageable pageable
+    );
+
+    // Projets populaires (par nombre de vues)
+    @Query("SELECT p FROM Project p WHERE p.status = :status AND p.views > :minViews ORDER BY p.views DESC")
+    List<Project> findPopularProjects(@Param("status") ProjectStatus status,
+                                      @Param("minViews") Integer minViews,
+                                      Pageable pageable);
+
+    // Projets par plage de dates
+    @Query("SELECT p FROM Project p WHERE p.status = :status AND p.createdAt BETWEEN :startDate AND :endDate")
+    Page<Project> findByStatusAndCreatedAtBetween(@Param("status") ProjectStatus status,
+                                                  @Param("startDate") java.time.LocalDateTime startDate,
+                                                  @Param("endDate") java.time.LocalDateTime endDate,
+                                                  Pageable pageable);
+
+    // Rechercher projets par porteur username
+    @Query("SELECT p FROM Project p WHERE p.porteur.username = :username AND p.status = :status")
+    Page<Project> findByPorteurUsernameAndStatus(@Param("username") String username,
+                                                 @Param("status") ProjectStatus status,
+                                                 Pageable pageable);
+
+    // Compter projets par porteur username
+    @Query("SELECT COUNT(p) FROM Project p WHERE p.porteur.username = :username AND p.status = :status")
+    long countByPorteurUsernameAndStatus(@Param("username") String username,
+                                         @Param("status") ProjectStatus status);
+
+    // Récupérer toutes les provinces distinctes
+    @Query("SELECT DISTINCT p.province FROM Project p WHERE p.status = :status ORDER BY p.province")
+    List<String> findDistinctProvincesByStatus(@Param("status") ProjectStatus status);
+
+    // Récupérer tous les secteurs distincts avec projets actifs
+    @Query("SELECT DISTINCT s.name FROM Project p JOIN p.sector s WHERE p.status = :status ORDER BY s.name")
+    List<String> findDistinctSectorNamesByStatus(@Param("status") ProjectStatus status);
