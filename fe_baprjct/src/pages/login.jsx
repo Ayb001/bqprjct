@@ -13,7 +13,7 @@ const Login = () => {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const API_BASE_URL = 'http://localhost:8080/api/auth';
+  const API_BASE_URL = 'http://localhost:8080/api/api/auth';
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
