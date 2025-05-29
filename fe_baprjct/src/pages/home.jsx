@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
-  
-
-/* global anime */
 
 function Home() {
   const loadScript = (src) =>
     new Promise((resolve, reject) => {
+      if (document.querySelector(`script[src="${src}"]`)) {
+        resolve();
+        return;
+      }
+      
       const script = document.createElement('script');
       script.src = src;
       script.async = true;
@@ -15,104 +17,142 @@ function Home() {
     });
 
   useEffect(() => {
-    // Remove all styles except styles.css
-    const originalLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'));
-    const removedLinks = [];
-
-    originalLinks.forEach((link) => {
-      const href = link.getAttribute('href') || '';
-      if (!href.includes('styles.css')) {
-        removedLinks.push(link);
-        link.parentNode.removeChild(link);
+    // Add CSS reset and styles.css
+    const cssReset = document.createElement('style');
+    cssReset.id = 'home-css-reset';
+    cssReset.textContent = `
+      /* Reset all styles for home page */
+      .home-isolated {
+        all: unset;
+        display: block;
+        font-family: inherit;
       }
-    });
+      
+      .home-isolated * {
+        all: unset;
+        display: revert;
+        box-sizing: border-box;
+      }
+      
+      /* Preserve some essential styles */
+      .home-isolated a { cursor: pointer; }
+      .home-isolated button { cursor: pointer; }
+      .home-isolated input, .home-isolated textarea { cursor: text; }
+    `;
+    document.head.appendChild(cssReset);
 
-    // Ensure styles.css is loaded if not present
-    const hasStyles = originalLinks.some(link => (link.href || '').includes('styles.css'));
-    let stylesLink;
-    if (!hasStyles) {
-      stylesLink = document.createElement('link');
-      stylesLink.rel = 'stylesheet';
-      stylesLink.href = '/css/styles.css';
-      document.head.appendChild(stylesLink);
-    }
+    // Load styles.css specifically
+    const stylesLink = document.createElement('link');
+    stylesLink.id = 'home-styles-css';
+    stylesLink.rel = 'stylesheet';
+    stylesLink.href = process.env.PUBLIC_URL + '/css/styles.css';
+    document.head.appendChild(stylesLink);
 
-    Promise.resolve()
-      .then(() => loadScript('/js/jquery.min.js'))
-      .then(() => loadScript('/js/bootstrap.min.js'))
-      .then(() => loadScript('/js/popper.min.js'))
-      .then(() => loadScript('https://cdnjs.cloudflare.com/ajax/libs/jquery-easing/1.4.1/jquery.easing.min.js'))
-      .then(() => loadScript('/js/jquery.magnific-popup.js'))
-      .then(() => loadScript('/js/morphext.min.js'))
-      .then(() => loadScript('/js/isotope.pkgd.min.js'))
-      .then(() => loadScript('/js/validator.min.js'))
-      .then(() => loadScript('/js/scripts.js'))
-      .then(() => loadScript('https://cdnjs.cloudflare.com/ajax/libs/animejs/2.0.2/anime.min.js'))
-      .then(() => {
-        const animationTimer = setTimeout(() => {
-          if (typeof anime !== 'undefined') {
-            const textWrapper = document.querySelector('#js-rotating');
-            if (!textWrapper) {
-              console.error("Element #js-rotating not found");
-              return;
-            }
+    // Load scripts
+    const loadHomeScripts = async () => {
+      try {
+        await loadScript(process.env.PUBLIC_URL + '/js/jquery.min.js');
+        await loadScript(process.env.PUBLIC_URL + '/js/bootstrap.min.js');
+        await loadScript(process.env.PUBLIC_URL + '/js/popper.min.js');
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jquery-easing/1.4.1/jquery.easing.min.js');
+        await loadScript(process.env.PUBLIC_URL + '/js/jquery.magnific-popup.js');
+        await loadScript(process.env.PUBLIC_URL + '/js/morphext.min.js');
+        await loadScript(process.env.PUBLIC_URL + '/js/isotope.pkgd.min.js');
+        await loadScript(process.env.PUBLIC_URL + '/js/validator.min.js');
+        await loadScript(process.env.PUBLIC_URL + '/js/scripts.js');
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/animejs/2.0.2/anime.min.js');
+        
+        initializeAnimations();
+      } catch (error) {
+        console.error('Failed to load scripts:', error);
+      }
+    };
 
-            textWrapper.style.opacity = 0;
+    loadHomeScripts();
 
-            const phrases = [
-              "D'INVESTISSEMENT",
-              "D'ACCOMPAGNEMENT",
-              "DE PROJETS"
-            ];
-            let currentPhraseIndex = 0;
-
-            function setPhrase() {
-              const cleanText = phrases[currentPhraseIndex].trim();
-              textWrapper.innerHTML = cleanText.replace(/\S/g, "<span class='letter'>$&</span>");
-            }
-
-            function animatePhrase() {
-              setPhrase();
-              anime.timeline({ loop: false })
-                .add({
-                  targets: '#js-rotating .letter',
-                  opacity: [0, 1],
-                  easing: "easeInOutQuad",
-                  duration: 2250,
-                  delay: (el, i) => 150 * (i + 1),
-                  begin: () => {
-                    textWrapper.style.opacity = 1;
-                  }
-                })
-                .add({
-                  targets: '#js-rotating',
-                  opacity: 0,
-                  duration: 1000,
-                  easing: "easeOutExpo",
-                  delay: 1000,
-                  complete: () => {
-                    currentPhraseIndex = (currentPhraseIndex + 1) % phrases.length;
-                    animatePhrase();
-                  }
-                });
-            }
-
-            animatePhrase();
-          } else {
-            console.error("anime.js not loaded");
-          }
-        }, 1000);
-
-        return () => clearTimeout(animationTimer);
-      })
-      .catch((err) => console.error('Failed to load scripts:', err));
-
-    // Restore removed styles on unmount
+    // Cleanup
     return () => {
-      removedLinks.forEach(link => document.head.appendChild(link));
-      if (stylesLink) document.head.removeChild(stylesLink);
+      // Remove added CSS
+      const resetStyle = document.getElementById('home-css-reset');
+      const stylesCSS = document.getElementById('home-styles-css');
+      
+      if (resetStyle) resetStyle.remove();
+      if (stylesCSS) stylesCSS.remove();
+
+      // Remove scripts
+      const scriptsToRemove = [
+        process.env.PUBLIC_URL + '/js/jquery.min.js',
+        process.env.PUBLIC_URL + '/js/bootstrap.min.js',
+        process.env.PUBLIC_URL + '/js/popper.min.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/jquery-easing/1.4.1/jquery.easing.min.js',
+        process.env.PUBLIC_URL + '/js/jquery.magnific-popup.js',
+        process.env.PUBLIC_URL + '/js/morphext.min.js',
+        process.env.PUBLIC_URL + '/js/isotope.pkgd.min.js',
+        process.env.PUBLIC_URL + '/js/validator.min.js',
+        process.env.PUBLIC_URL + '/js/scripts.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/animejs/2.0.2/anime.min.js'
+      ];
+      
+      scriptsToRemove.forEach(src => {
+        const script = document.querySelector(`script[src="${src}"]`);
+        if (script) script.remove();
+      });
     };
   }, []);
+
+  const initializeAnimations = () => {
+    setTimeout(() => {
+      if (typeof window.anime !== 'undefined') {
+        const textWrapper = document.querySelector('#js-rotating');
+        if (!textWrapper) {
+          console.error("Element #js-rotating not found");
+          return;
+        }
+
+        textWrapper.style.opacity = '0';
+
+        const phrases = [
+          "D'INVESTISSEMENT",
+          "D'ACCOMPAGNEMENT",
+          "DE PROJETS"
+        ];
+        let currentPhraseIndex = 0;
+
+        function setPhrase() {
+          const cleanText = phrases[currentPhraseIndex].trim();
+          textWrapper.innerHTML = cleanText.replace(/\S/g, "<span class='letter'>$&</span>");
+        }
+
+        function animatePhrase() {
+          setPhrase();
+          window.anime.timeline({ loop: false })
+            .add({
+              targets: '#js-rotating .letter',
+              opacity: [0, 1],
+              easing: "easeInOutQuad",
+              duration: 2250,
+              delay: (el, i) => 150 * (i + 1),
+              begin: () => {
+                textWrapper.style.opacity = '1';
+              }
+            })
+            .add({
+              targets: '#js-rotating',
+              opacity: 0,
+              duration: 1000,
+              easing: "easeOutExpo",
+              delay: 1000,
+              complete: () => {
+                currentPhraseIndex = (currentPhraseIndex + 1) % phrases.length;
+                animatePhrase();
+              }
+            });
+        }
+
+        animatePhrase();
+      }
+    }, 1000);
+  };
 
   // start the return 
   return (
