@@ -8,6 +8,7 @@ import ProjectCatalog from './pages/project_catalog'
 import ProjectDetailsPage from './pages/project_details_page'
 import ChatBot from './pages/chat_bot'
 import SubmitPage from './pages/submit_page'
+import ArticlesPage from './pages/article_page' 
 import { BrowserRouter as Router, Route, Routes, BrowserRouter } from 'react-router-dom'
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
           <Route path="/project_details_page/:id" element={<ProjectDetailsPage />} />
           <Route path="/chat_bot" element={<ChatBot />} />
           <Route path="/submit_page" element={<SubmitPage />} />
+          <Route path="/article_page" element={<ArticlesPage />} />
         </Routes>
       </BrowserRouter>
     </div>

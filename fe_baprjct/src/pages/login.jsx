@@ -35,7 +35,7 @@ const Login = () => {
                     <i className="fas fa-lock"></i>
                     <input type="password" placeholder="Entrez votre mot de passe" required />
                   </div>
-                  <div className="login-text"><a href="#">Mot de passe oublié ?</a></div>
+                  <div className="login-text"><a href="/forgot_password">Mot de passe oublié ?</a></div>
                   <div className="login-button login-input-box">
                     <input type="submit" value="Submit" />
                   </div>
