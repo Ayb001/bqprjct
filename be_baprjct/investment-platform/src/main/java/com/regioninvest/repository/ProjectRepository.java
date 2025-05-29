@@ -152,4 +152,4 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     // Récupérer tous les secteurs distincts avec projets actifs
     @Query("SELECT DISTINCT s.name FROM Project p JOIN p.sector s WHERE p.status = :status ORDER BY s.name")
-    List<String> findDistinctSectorNamesByStatus(@Param("status") ProjectStatus status);
+    List<String> findDistinctSectorNamesByStatus(@Param("status") ProjectStatus status);}

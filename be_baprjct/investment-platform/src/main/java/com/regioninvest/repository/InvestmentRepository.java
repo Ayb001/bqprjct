@@ -1,9 +1,7 @@
 package com.regioninvest.repository;
 
-import com.regioninvest.entity.Project;
-import com.regioninvest.entity.ProjectStatus;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import com.regioninvest.entity.Investment;
+import com.regioninvest.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,86 +9,16 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 
 @Repository
-public interface ProjectRepository extends JpaRepository<Project, Long> {
-
-    // Recherche de base par statut
-    Page<Project> findByStatus(ProjectStatus status, Pageable pageable);
-
-    // Recherche avec filtres multiples
-    @Query("SELECT p FROM Project p WHERE " +
-            "(:status IS NULL OR p.status = :status) AND " +
-            "(:searchTerm IS NULL OR :searchTerm = '' OR " +
-            " LOWER(p.title) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-            " LOWER(p.description) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND " +
-            "(:province IS NULL OR :province = '' OR p.province = :province) AND " +
-            "(:sectorName IS NULL OR :sectorName = '' OR p.sector.name LIKE %:sectorName%) AND " +
-            "(:minBudget IS NULL OR p.budget >= :minBudget) AND " +
-            "(:maxBudget IS NULL OR p.budget <= :maxBudget)")
-    Page<Project> findProjectsWithFilters(
-            @Param("status") ProjectStatus status,
-            @Param("searchTerm") String searchTerm,
-            @Param("province") String province,
-            @Param("sectorName") String sectorName,
-            @Param("minBudget") BigDecimal minBudget,
-            @Param("maxBudget") BigDecimal maxBudget,
-            Pageable pageable
-    );
-
-    // Recherche par secteur pour projets similaires
-    @Query("SELECT p FROM Project p WHERE p.sector.id = :sectorId AND p.id != :excludeId AND p.status = :status ORDER BY p.views DESC")
-    List<Project> findSimilarProjectsBySector(@Param("sectorId") Long sectorId,
-                                              @Param("excludeId") Long excludeId,
-                                              @Param("status") ProjectStatus status,
-                                              Pageable pageable);
-
-    // Recherche par province pour projets similaires
-    @Query("SELECT p FROM Project p WHERE p.province = :province AND p.id != :excludeId AND p.status = :status ORDER BY p.views DESC")
-    List<Project> findSimilarProjectsByProvince(@Param("province") String province,
-                                                @Param("excludeId") Long excludeId,
-                                                @Param("status") ProjectStatus status,
-                                                Pageable pageable);
-
-    // Projets par utilisateur (porteur)
-    Page<Project> findByPorteurIdAndStatus(Long porteurId, ProjectStatus status, Pageable pageable);
-
-    // Recherche par ID avec porteur
-    @Query("SELECT p FROM Project p LEFT JOIN FETCH p.porteur LEFT JOIN FETCH p.sector WHERE p.id = :id")
-    Optional<Project> findByIdWithDetails(@Param("id") Long id);
-
-    // Statistiques par secteur
-    @Query("SELECT p.sector.name, COUNT(p), SUM(p.budget), SUM(p.jobs) FROM Project p WHERE p.status = :status GROUP BY p.sector.name")
-    List<Object[]> getProjectStatsBySector(@Param("status") ProjectStatus status);
-
-    // Top projets les plus vus
-    Page<Project> findByStatusOrderByViewsDesc(ProjectStatus status, Pageable pageable);
-
-    // Projets récents
-    Page<Project> findByStatusOrderByCreatedAtDesc(ProjectStatus status, Pageable pageable);
-
-    // Compter projets par statut
-    long countByStatus(ProjectStatus status);
-
-    // Compter projets par porteur
-    long countByPorteurIdAndStatus(Long porteurId, ProjectStatus status);
-
-    // Recherche full-text dans titre et description
-    @Query("SELECT p FROM Project p WHERE p.status = :status AND " +
-            "(LOWER(p.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            " LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            " LOWER(p.location) LIKE LOWER(CONCAT('%', :keyword, '%')))")
-    Page<Project> searchByKeyword(@Param("keyword") String keyword,
-                                  @Param("status") ProjectStatus status,
-                                  Pageable pageable);
-
-    // Projets par budget range
-    Page<Project> findByStatusAndBudgetBetween(ProjectStatus status,
-                                               BigDecimal minBudget,
-                                               BigDecimal maxBudget,
-                                               Pageable pageable);
-
-    // Projets par province
-    Page<Project> findByStatusAndProvince(ProjectStatus status, String province, Pageable pageable);
+public interface InvestmentRepository extends JpaRepository<Investment, Long> {
+    
+    // Méthodes utilisées par InvestmentService
+    List<Investment> findByUserOrderByCreatedAtDesc(User user);
+    
+    @Query("SELECT SUM(i.amount) FROM Investment i WHERE i.user = :user")
+    BigDecimal getTotalInvestmentByUser(@Param("user") User user);
+    
+    @Query("SELECT i.investmentType, SUM(i.amount) FROM Investment i WHERE i.user = :user GROUP BY i.investmentType")
+    List<Object[]> getInvestmentsByTypeForUser(@Param("user") User user);
 }

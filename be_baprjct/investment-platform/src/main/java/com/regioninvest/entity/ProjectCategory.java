@@ -1,0 +1,6 @@
+package com.regioninvest.entity;
+
+public enum ProjectCategory {
+    TRADITIONAL_CRAFTS, RENEWABLE_ENERGY, EDUCATION, TOURISM, 
+    AGRICULTURE, HEALTH, HERITAGE, TECHNOLOGY, INDUSTRY
+}
