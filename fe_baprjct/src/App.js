@@ -39,7 +39,7 @@ function App() {
             } 
           />
           <Route 
-            path="/project_details_page/:id" 
+            path="/project_details_page" 
             element={
               <ProtectedRoute>
                 <ProjectDetailsPage />

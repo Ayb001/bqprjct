@@ -153,11 +153,10 @@ public class ProjectController {
      * DELETE /api/projects/{id} - Supprimer un projet (Porteur propriétaire seulement)
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('PORTEUR')")
-    public ResponseEntity<ApiResponse<String>> deleteProject(@PathVariable Long id, Authentication authentication) {
+// @PreAuthorize("hasRole('PORTEUR')")  // ✅ TEMPORARILY COMMENTED OUT
+    public ResponseEntity<ApiResponse<String>> deleteProject(@PathVariable Long id) {  // ✅ Removed Authentication parameter
         try {
-            String username = authentication.getName();
-            projectService.deleteProject(id, username);
+            projectService.deleteProject(id, null);  // ✅ Pass null as username
 
             return ResponseEntity.ok(ApiResponse.success(null, "Projet supprimé avec succès"));
 

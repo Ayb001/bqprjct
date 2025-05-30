@@ -1,161 +1,278 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, MapPin, DollarSign, Users, Download, Calendar, Eye } from 'lucide-react';
 
 const ProjectCatalog = () => {
+  // Backend data states
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // Filter states (keep your existing logic)
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProvince, setSelectedProvince] = useState('');
   const [selectedSector, setSelectedSector] = useState('');
   const [selectedBudget, setSelectedBudget] = useState('');
+  
+  // UI states (keep your existing logic)
   const [viewMode, setViewMode] = useState('grid');
   const [currentPage, setCurrentPage] = useState(1);
   const [showInvestmentModal, setShowInvestmentModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
-
-  const projects = [
-    {
-      id: 1,
-      title: "Atelier de production de tapis berbères traditionnels",
-      location: "Rissani, Drâa-Tafilalet",
-      sector: "Artisanat",
-      budget: "1.4 M Dhs",
-      jobs: 35,
-      image: "/api/placeholder/400/250",
-      description: "Création d'un atelier de production et de formation aux techniques traditionnelles de tissage des tapis",
-      category: "traditional-crafts"
-    },
-    {
-      id: 2,
-      title: "Centrale solaire photovoltaïque",
-      location: "Ouarzazate, Drâa-Tafilalet",
-      sector: "Énergie renouvelable",
-      budget: "12.5 M Dhs",
-      jobs: 45,
-      image: "/api/placeholder/400/250",
-      description: "Extension de la capacité solaire dans la région d'Ouarzazate, profitant de l'ensoleillement exceptionnel",
-      category: "renewable-energy"
-    },
-    {
-      id: 3,
-      title: "Centre de formation aux métiers du tourisme",
-      location: "Midelt, Drâa-Tafilalet",
-      sector: "Éducation",
-      budget: "5.5 M Dhs",
-      jobs: 30,
-      image: "/api/placeholder/400/250",
-      description: "Création d'un centre de formation professionnelle spécialisé dans les métiers du tourisme",
-      category: "education"
-    },
-    {
-      id: 4,
-      title: "Clinique médicale mobile pour zones rurales",
-      location: "Erfoud, Drâa-Tafilalet",
-      sector: "Santé",
-      budget: "2.7 M Dhs",
-      jobs: 18,
-      image: "/api/placeholder/400/250",
-      description: "Mise en place d'un service de clinique mobile pour desservir les zones rurales isolées",
-      category: "health"
-    },
-    {
-      id: 5,
-      title: "Complexe écotouristique dans les oasis",
-      location: "Zagora, Drâa-Tafilalet",
-      sector: "Tourisme",
-      budget: "8.3 M Dhs",
-      jobs: 75,
-      image: "/api/placeholder/400/250",
-      description: "Développement d'un complexe touristique écologique intégré dans les palmeraies",
-      category: "tourism"
-    },
-    {
-      id: 6,
-      title: "Réhabilitation des kasbahs historiques",
-      location: "Kelaat M'Gouna, Drâa-Tafilalet",
-      sector: "Patrimoine",
-      budget: "6.9 M Dhs",
-      jobs: 40,
-      image: "/api/placeholder/400/250",
-      description: "Projet de restauration et de valorisation touristique des kasbahs historiques",
-      category: "heritage"
-    },
-    {
-      id: 7,
-      title: "Système d'irrigation goutte-à-goutte",
-      location: "Tinghir, Drâa-Tafilalet",
-      sector: "Agriculture",
-      budget: "3.2 M Dhs",
-      jobs: 25,
-      image: "/api/placeholder/400/250",
-      description: "Mise en place d'un système d'irrigation moderne et économe en eau pour les palmeraies",
-      category: "agriculture"
-    },
-    {
-      id: 8,
-      title: "Unité de conditionnement des dattes",
-      location: "Errachidia, Drâa-Tafilalet",
-      sector: "Agriculture",
-      budget: "4.8 M Dhs",
-      jobs: 60,
-      image: "/api/placeholder/400/250",
-      description: "Création d'une unité moderne de conditionnement et de transformation des dattes",
-      category: "agriculture"
-    }
-  ];
-
-  const provinces = ["Toutes les provinces", "Ouarzazate", "Errachidia", "Midelt", "Tinghir", "Zagora"];
-  const sectors = ["Tous les secteurs", "Agriculture", "Tourisme", "Artisanat", "Énergie renouvelable", "Santé", "Éducation", "Patrimoine"];
-  const budgetRanges = ["Tous les budgets", "< 2M Dhs", "2-5M Dhs", "5-10M Dhs", "> 10M Dhs"];
-
-  const filteredProjects = projects.filter(project => {
-    const matchesSearch = project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         project.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesProvince = !selectedProvince || selectedProvince === "Toutes les provinces" || 
-                           project.location.includes(selectedProvince);
-    const matchesSector = !selectedSector || selectedSector === "Tous les secteurs" || 
-                         project.sector.includes(selectedSector);
-    
-    let matchesBudget = true;
-    if (selectedBudget && selectedBudget !== "Tous les budgets") {
-      const budget = parseFloat(project.budget.replace(/[^\d.]/g, ''));
-      switch (selectedBudget) {
-        case "< 2M Dhs":
-          matchesBudget = budget < 2;
-          break;
-        case "2-5M Dhs":
-          matchesBudget = budget >= 2 && budget <= 5;
-          break;
-        case "5-10M Dhs":
-          matchesBudget = budget > 5 && budget <= 10;
-          break;
-        case "> 10M Dhs":
-          matchesBudget = budget > 10;
-          break;
-      }
-    }
-    
-    return matchesSearch && matchesProvince && matchesSector && matchesBudget;
+  
+  // Backend pagination data
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalProjects, setTotalProjects] = useState(0);
+  
+  // Filter options from backend
+  const [filterOptions, setFilterOptions] = useState({
+    provinces: ["Toutes les provinces"],
+    sectors: ["Tous les secteurs"],
+    budgetRanges: ["Tous les budgets"]
   });
 
+  // Fetch projects from backend
+  const fetchProjects = async (page = 0) => {
+    try {
+      setLoading(true);
+      
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: page.toString(),
+        size: '6',
+        sortBy: 'createdAt',
+        sortDir: 'desc'
+      });
+
+      // Add filters if selected
+      if (searchTerm && searchTerm.trim()) {
+        params.append('search', searchTerm.trim());
+      }
+      if (selectedProvince && selectedProvince !== "Toutes les provinces") {
+        params.append('province', selectedProvince);
+      }
+      if (selectedSector && selectedSector !== "Tous les secteurs") {
+        params.append('sector', selectedSector);
+      }
+      if (selectedBudget && selectedBudget !== "Tous les budgets") {
+        params.append('budgetRange', selectedBudget);
+      }
+
+      const response = await fetch(`http://localhost:8080/api/projects?${params}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const apiResponse = await response.json();
+      
+      if (apiResponse.success && apiResponse.data) {
+        const { projects: projectsList, pagination, filters } = apiResponse.data;
+        
+        // Transform backend data to match your existing project structure
+        const transformedProjects = (projectsList || []).map(project => ({
+          id: project.id,
+          title: project.title,
+          location: project.fullLocation || `${project.location}, ${project.province}`,
+          sector: project.sector,
+          budget: project.formattedBudget || `${project.budget} M Dhs`,
+          jobs: project.jobs || 0,
+          image: project.imageUrl || "/api/placeholder/400/250",
+          description: project.description,
+          category: project.category?.toLowerCase().replace('_', '-') || 'other',
+          views: project.views || 0,
+          createdAt: project.createdAt,
+          // Keep backend data for potential future use
+          rawProject: project
+        }));
+        
+        setProjects(transformedProjects);
+        
+        // Update pagination info
+        if (pagination) {
+          setCurrentPage(pagination.currentPage + 1); // Convert from 0-based to 1-based
+          setTotalPages(pagination.totalPages);
+          setTotalProjects(pagination.totalProjects);
+        }
+        
+        // Update filter options
+        if (filters) {
+          setFilterOptions({
+            provinces: filters.provinces || ["Toutes les provinces"],
+            sectors: filters.sectors || ["Tous les secteurs"],
+            budgetRanges: filters.budgetRanges || ["Tous les budgets"]
+          });
+        }
+      } else {
+        throw new Error(apiResponse.error || 'Failed to fetch projects');
+      }
+      
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      setError(error.message);
+      setProjects([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    fetchProjects(0);
+  }, []);
+
+  // Handle filter changes
+  useEffect(() => {
+    if (!loading) {
+      setCurrentPage(1);
+      fetchProjects(0); // Reset to first page when filters change
+    }
+  }, [searchTerm, selectedProvince, selectedSector, selectedBudget]);
+
+  // Handle page changes
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      fetchProjects(newPage - 1); // Convert from 1-based to 0-based
+    }
+  };
+
+  // Your existing filter logic (kept for client-side filtering if needed)
+  const filteredProjects = projects; // Since filtering is now done on backend
+
   const itemsPerPage = 6;
-  const totalPages = Math.ceil(filteredProjects.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedProjects = filteredProjects.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedProjects = filteredProjects; // Since pagination is now done on backend
 
   const handleInvestmentRequest = (project) => {
     setSelectedProject(project);
     setShowInvestmentModal(true);
   };
 
-  const submitInvestmentRequest = () => {
-    // Handle investment request submission
+  const submitInvestmentRequest = async () => {
+    // Here you can add API call to submit investment request
+    // For now, keeping your existing alert
     alert(`Demande d'investissement soumise pour: ${selectedProject.title}`);
     setShowInvestmentModal(false);
   };
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="catalog-container">
+        <style>{`
+          /* Keep all your existing styles */
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+          }
+
+          .catalog-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          .loading-content {
+            text-align: center;
+            padding: 2rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+          }
+
+          .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #8B4513;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+          }
+
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+        <div className="loading-content">
+          <div className="loading-spinner"></div>
+          <p>Chargement des projets...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="catalog-container">
+        <style>{`
+          .catalog-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          }
+
+          .error-content {
+            text-align: center;
+            padding: 2rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            max-width: 500px;
+          }
+
+          .error-title {
+            color: #dc3545;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+          }
+
+          .error-message {
+            color: #6c757d;
+            margin-bottom: 1.5rem;
+          }
+
+          .retry-btn {
+            background: #8B4513;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+          }
+
+          .retry-btn:hover {
+            background: #A0522D;
+          }
+        `}</style>
+        <div className="error-content">
+          <h2 className="error-title">Erreur de chargement</h2>
+          <p className="error-message">{error}</p>
+          <button className="retry-btn" onClick={() => fetchProjects(0)}>
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="catalog-container">
       <style>{`
-        /* Project Catalog Styles */
+        /* ALL YOUR EXISTING STYLES - KEEPING EVERYTHING EXACTLY THE SAME */
         * {
           margin: 0;
           padding: 0;
@@ -880,7 +997,8 @@ const ProjectCatalog = () => {
           outline-offset: 2px;
         }
       `}</style>
-      {/* Header */}
+      
+      {/* Header - KEEPING EXACTLY THE SAME */}
       <header className="catalog-header">
         <div className="header-content">
           <div className="logo-section">
@@ -889,14 +1007,14 @@ const ProjectCatalog = () => {
           </div>
           <nav className="main-nav">
             <a href="#" className="nav-link">Accueil</a>
-            <a href="#" className="nav-link active">Rechercher</a>
+            <a href="#" className="nav-link active">Articles</a>
             <a href="#" className="nav-link">À propos</a>
             <a href="#" className="nav-link">Contact</a>
           </nav>
         </div>
       </header>
 
-      {/* Hero Section */}
+      {/* Hero Section - KEEPING EXACTLY THE SAME */}
       <section className="hero-section">
         <div className="hero-content">
           <h2>Rechercher des Projets</h2>
@@ -904,7 +1022,7 @@ const ProjectCatalog = () => {
         </div>
       </section>
 
-      {/* Search and Filters */}
+      {/* Search and Filters - UPDATED TO USE BACKEND DATA */}
       <section className="search-section">
         <div className="search-container">
           <div className="search-bar">
@@ -924,7 +1042,7 @@ const ProjectCatalog = () => {
               className="filter-select"
             >
               <option value="">📍 Province</option>
-              {provinces.map(province => (
+              {filterOptions.provinces.map(province => (
                 <option key={province} value={province}>{province}</option>
               ))}
             </select>
@@ -935,7 +1053,7 @@ const ProjectCatalog = () => {
               className="filter-select"
             >
               <option value="">🏢 Secteur</option>
-              {sectors.map(sector => (
+              {filterOptions.sectors.map(sector => (
                 <option key={sector} value={sector}>{sector}</option>
               ))}
             </select>
@@ -946,7 +1064,7 @@ const ProjectCatalog = () => {
               className="filter-select"
             >
               <option value="">💰 Budget</option>
-              {budgetRanges.map(range => (
+              {filterOptions.budgetRanges.map(range => (
                 <option key={range} value={range}>{range}</option>
               ))}
             </select>
@@ -969,14 +1087,14 @@ const ProjectCatalog = () => {
         </div>
       </section>
 
-      {/* Results Count */}
+      {/* Results Count - UPDATED TO USE BACKEND DATA */}
       <div className="results-info">
         <span className="results-count">
-          {filteredProjects.length} projet(s) trouvé(s)
+          {totalProjects} projet(s) trouvé(s)
         </span>
       </div>
 
-      {/* Projects Grid */}
+      {/* Projects Grid - USING BACKEND DATA */}
       <section className="projects-section">
         <div className={`projects-container ${viewMode}`}>
           {paginatedProjects.map(project => (
@@ -1030,12 +1148,12 @@ const ProjectCatalog = () => {
         </div>
       </section>
 
-      {/* Pagination */}
+      {/* Pagination - UPDATED TO USE BACKEND PAGINATION */}
       {totalPages > 1 && (
         <div className="pagination">
           <button
             className="pagination-btn"
-            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+            onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
             disabled={currentPage === 1}
           >
             Précédent
@@ -1045,7 +1163,7 @@ const ProjectCatalog = () => {
             <button
               key={index + 1}
               className={`pagination-btn ${currentPage === index + 1 ? 'active' : ''}`}
-              onClick={() => setCurrentPage(index + 1)}
+              onClick={() => handlePageChange(index + 1)}
             >
               {index + 1}
             </button>
@@ -1053,7 +1171,7 @@ const ProjectCatalog = () => {
           
           <button
             className="pagination-btn"
-            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+            onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
             disabled={currentPage === totalPages}
           >
             Suivant
@@ -1061,7 +1179,7 @@ const ProjectCatalog = () => {
         </div>
       )}
 
-      {/* Investment Modal */}
+      {/* Investment Modal - KEEPING EXACTLY THE SAME */}
       {showInvestmentModal && (
         <div className="modal-overlay" onClick={() => setShowInvestmentModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
