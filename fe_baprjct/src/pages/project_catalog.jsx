@@ -1006,8 +1006,8 @@ const ProjectCatalog = () => {
             <h1>Banque de projets</h1>
           </div>
           <nav className="main-nav">
-            <a href="#" className="nav-link">Accueil</a>
-            <a href="#" className="nav-link active">Articles</a>
+            <a href="/project_catalog" className="nav-link">Accueil</a>
+            <a href="/article_page" className="nav-link active">Articles</a>
             <a href="#" className="nav-link">À propos</a>
             <a href="#" className="nav-link">Contact</a>
           </nav>

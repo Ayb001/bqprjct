@@ -99,10 +99,41 @@ public class ProjectController {
 
     /**
      * POST /api/projects - Créer un nouveau projet (Porteur seulement)
+     * ✅ UPDATED FOR REACT - Accepts JSON instead of multipart
      */
     @PostMapping
     @PreAuthorize("hasRole('PORTEUR')")
     public ResponseEntity<ApiResponse<ProjectDTO>> createProject(
+            @Valid @RequestBody ProjectCreateRequest request,
+            Authentication authentication) {
+
+        try {
+            String username = authentication.getName();
+
+            // For React frontend, we handle image upload separately
+            // This endpoint accepts JSON only, image upload can be done via separate endpoint
+            ProjectDTO createdProject = projectService.createProject(request, null, username);
+
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(ApiResponse.success(createdProject, "Projet créé avec succès"));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error("Données invalides: " + e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace(); // For debugging
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Erreur lors de la création du projet: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * POST /api/projects/upload - Upload project with image (multipart)
+     * ✅ NEW ENDPOINT for React file uploads
+     */
+    @PostMapping("/upload")
+    @PreAuthorize("hasRole('PORTEUR')")
+    public ResponseEntity<ApiResponse<ProjectDTO>> createProjectWithImage(
             @Valid @RequestPart("project") ProjectCreateRequest request,
             @RequestPart(value = "image", required = false) MultipartFile image,
             Authentication authentication) {
@@ -118,6 +149,7 @@ public class ProjectController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.error("Données invalides: " + e.getMessage()));
         } catch (Exception e) {
+            e.printStackTrace(); // For debugging
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("Erreur lors de la création du projet: " + e.getMessage()));
         }

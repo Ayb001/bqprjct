@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -29,9 +30,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     @Bean
@@ -59,16 +62,22 @@ public class SecurityConfig {
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authz -> authz
-                        // Public endpoints
+                        // 🔓 Public endpoints - No authentication required
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+                        .requestMatchers("/api/test/**").permitAll()  // ✅ ADDED FOR TESTING
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
 
-                        // FIXED: Allow all project operations (GET, POST, PUT, DELETE) for testing
-                        .requestMatchers("/api/projects/**").permitAll()
+                        // 🔓 Project READ operations - Anyone can view projects
+                        .requestMatchers("GET", "/api/projects/**").permitAll()
 
-                        // All other requests need authentication
+                        // 🔒 Project WRITE operations - Requires authentication (handled by @PreAuthorize)
+                        .requestMatchers("POST", "/api/projects/**").authenticated()
+                        .requestMatchers("PUT", "/api/projects/**").authenticated()
+                        .requestMatchers("DELETE", "/api/projects/**").authenticated()
+
+                        // 🔒 All other requests need authentication
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint()))
@@ -84,7 +93,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // FIXED: Use specific origins instead of patterns for better compatibility
+        // 🌐 Allow React development servers
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
@@ -96,10 +105,10 @@ public class SecurityConfig {
                 "GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"
         ));
 
-        // Allow all headers
+        // Allow all headers (including Authorization)
         configuration.setAllowedHeaders(Arrays.asList("*"));
 
-        // IMPORTANT: Set to true for credentials
+        // 🔑 IMPORTANT: Enable credentials for JWT tokens
         configuration.setAllowCredentials(true);
 
         // Cache preflight for 1 hour
@@ -115,7 +124,11 @@ public class SecurityConfig {
         @Override
         public void commence(HttpServletRequest request, HttpServletResponse response,
                              org.springframework.security.core.AuthenticationException authException) throws IOException {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
+            response.setContentType("application/json");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getOutputStream().println(
+                    "{ \"error\": \"Unauthorized\", \"message\": \"Authentication required\", \"status\": 401 }"
+            );
         }
     }
 
@@ -127,6 +140,33 @@ public class SecurityConfig {
 
         @Autowired
         private JwtUtil jwtUtil;
+
+        // 🔓 Skip JWT processing only for truly public endpoints
+        private static final List<String> PUBLIC_PATHS = Arrays.asList(
+                "/api/auth/",
+                "/api/public/",
+                "/api/test/",     // ✅ ADDED FOR TESTING
+                "/h2-console/",
+                "/uploads/"
+        );
+
+        @Override
+        protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+            String path = request.getRequestURI();
+            String method = request.getMethod();
+
+            // Skip JWT for public paths
+            if (PUBLIC_PATHS.stream().anyMatch(path::startsWith)) {
+                return true;
+            }
+
+            // Skip JWT for GET requests to projects (anyone can view)
+            if ("GET".equals(method) && path.startsWith("/api/projects")) {
+                return true;
+            }
+
+            return false;
+        }
 
         @Override
         protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -142,19 +182,29 @@ public class SecurityConfig {
                 try {
                     username = jwtUtil.extractUsername(jwtToken);
                 } catch (Exception e) {
-                    logger.error("Unable to get JWT Token");
+                    logger.error("JWT Token extraction failed: " + e.getMessage());
                 }
+            } else {
+                logger.debug("No JWT token found in request header");
             }
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = userService.loadUserByUsername(username);
+                try {
+                    UserDetails userDetails = userService.loadUserByUsername(username);
 
-                if (jwtUtil.validateToken(jwtToken, userDetails)) {
-                    UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    if (jwtUtil.validateToken(jwtToken, userDetails)) {
+                        UsernamePasswordAuthenticationToken authToken =
+                                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                        SecurityContextHolder.getContext().setAuthentication(authToken);
+                        logger.debug("JWT authentication successful for user: " + username);
+                    } else {
+                        logger.warn("JWT token validation failed for user: " + username);
+                    }
+                } catch (Exception e) {
+                    logger.error("JWT authentication failed: " + e.getMessage());
                 }
             }
+
             chain.doFilter(request, response);
         }
     }
