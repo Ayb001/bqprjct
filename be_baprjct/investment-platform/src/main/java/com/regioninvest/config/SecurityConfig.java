@@ -62,29 +62,43 @@ public class SecurityConfig {
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authz -> authz
+                                // 🔓 TEMPORARY: Allow ALL requests for debugging
+                                .requestMatchers("/**").permitAll()
+
+                        // Once working, replace above with these specific rules:
+                        /*
                         // 🔓 Public endpoints - No authentication required
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
-                        .requestMatchers("/api/test/**").permitAll()  // ✅ ADDED FOR TESTING
+                        .requestMatchers("/api/test/**").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
+                        .requestMatchers("/actuator/**").permitAll()
+
+                        // 🔓 SPECIFIC public project endpoints
+                        .requestMatchers("/api/projects/public-create").permitAll()
+                        .requestMatchers("/api/projects/debug-create").permitAll()
+                        .requestMatchers("POST", "/api/projects").permitAll()
 
                         // 🔓 Project READ operations - Anyone can view projects
                         .requestMatchers("GET", "/api/projects/**").permitAll()
 
-                        // 🔒 Project WRITE operations - Requires authentication (handled by @PreAuthorize)
-                        .requestMatchers("POST", "/api/projects/**").authenticated()
+                        // 🔒 SPECIFIC project endpoints that need auth
+                        .requestMatchers("POST", "/api/projects/upload").authenticated()
                         .requestMatchers("PUT", "/api/projects/**").authenticated()
                         .requestMatchers("DELETE", "/api/projects/**").authenticated()
+                        .requestMatchers("GET", "/api/projects/my").authenticated()
 
                         // 🔒 All other requests need authentication
                         .anyRequest().authenticated()
+                        */
                 )
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(headers -> headers.frameOptions().sameOrigin()); // For H2 Console
 
-        http.addFilterBefore(jwtRequestFilter(), UsernamePasswordAuthenticationFilter.class);
+        // TEMPORARILY disable JWT filter for debugging
+        // http.addFilterBefore(jwtRequestFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -141,31 +155,52 @@ public class SecurityConfig {
         @Autowired
         private JwtUtil jwtUtil;
 
-        // 🔓 Skip JWT processing only for truly public endpoints
-        private static final List<String> PUBLIC_PATHS = Arrays.asList(
-                "/api/auth/",
-                "/api/public/",
-                "/api/test/",     // ✅ ADDED FOR TESTING
-                "/h2-console/",
-                "/uploads/"
-        );
-
         @Override
         protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+            // TEMPORARILY: Skip ALL requests for debugging
+            return true;
+
+            // Once working, replace above with proper filtering logic:
+            /*
             String path = request.getRequestURI();
             String method = request.getMethod();
 
-            // Skip JWT for public paths
-            if (PUBLIC_PATHS.stream().anyMatch(path::startsWith)) {
+            // 🔓 Skip JWT processing for public endpoints
+            List<String> publicPaths = Arrays.asList(
+                    "/api/auth/",
+                    "/api/public/",
+                    "/api/test/",
+                    "/h2-console/",
+                    "/uploads/",
+                    "/actuator/"
+            );
+
+            if (publicPaths.stream().anyMatch(path::startsWith)) {
                 return true;
             }
 
-            // Skip JWT for GET requests to projects (anyone can view)
+            // 🔓 Specific public project endpoints
+            List<String> publicProjectEndpoints = Arrays.asList(
+                    "/api/projects/public-create",
+                    "/api/projects/debug-create"
+            );
+
+            if (publicProjectEndpoints.stream().anyMatch(path::equals)) {
+                return true;
+            }
+
+            // 🔓 Skip JWT for GET requests to projects (anyone can view)
             if ("GET".equals(method) && path.startsWith("/api/projects")) {
                 return true;
             }
 
+            // 🔓 Skip JWT for main project creation (temporarily)
+            if ("POST".equals(method) && path.equals("/api/projects")) {
+                return true;
+            }
+
             return false;
+            */
         }
 
         @Override

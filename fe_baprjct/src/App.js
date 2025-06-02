@@ -9,6 +9,7 @@ import ProjectDetailsPage from './pages/project_details_page'
 import ChatBot from './pages/chat_bot'
 import SubmitPage from './pages/submit_page'
 import ArticlesPage from './pages/article_page' 
+import ProjectCatalogPorteur from './pages/project_ctalog_porteur'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom'
 
 // Protected Route Component
@@ -67,6 +68,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <ArticlesPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/project_catalog_porteur" 
+            element={
+              <ProtectedRoute>
+                <ProjectCatalogPorteur/>
               </ProtectedRoute>
             } 
           />

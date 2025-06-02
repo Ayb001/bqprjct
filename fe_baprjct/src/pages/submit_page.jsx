@@ -8,6 +8,7 @@ const SubmitProject = () => {
     budget: '',
     revenue: '',
     location: '',
+    province: '',
     jobs: '',
     profitability: '',
     goal: '',
@@ -22,17 +23,28 @@ const SubmitProject = () => {
   const [errors, setErrors] = useState({});
   const [imagePreview, setImagePreview] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState('');
 
   const sectors = [
+    'Agriculture',
     'Énergie renouvelable – Énergie solaire',
     'Énergie renouvelable – Énergie éolienne',
-    'Agriculture',
     'Tourisme',
     'Technologie',
     'Santé',
     'Éducation',
     'Artisanat',
     'Industrie'
+  ];
+
+  // Moroccan provinces in Drâa-Tafilalet region
+  const provinces = [
+    'Errachidia',
+    'Ouarzazate',
+    'Midelt',
+    'Tinghir',
+    'Zagora'
   ];
 
   const handleInputChange = (e) => {
@@ -74,6 +86,7 @@ const SubmitProject = () => {
     if (!formData.sector) newErrors.sector = 'Le secteur est requis';
     if (!formData.budget.trim()) newErrors.budget = 'Le budget est requis';
     if (!formData.location.trim()) newErrors.location = 'La localisation est requise';
+    if (!formData.province) newErrors.province = 'La province est requise';
     
     if (formData.budget && isNaN(parseFloat(formData.budget))) {
       newErrors.budget = 'Le budget doit être un nombre valide';
@@ -92,10 +105,99 @@ const SubmitProject = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
-    if (validateForm()) {
-      alert('Projet soumis avec succès!');
-      console.log('Form data:', formData);
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitMessage('');
+
+    try {
+      // Prepare the data for the backend
+      const projectData = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        sector: formData.sector,
+        location: formData.location.trim(),
+        province: formData.province,
+        budget: parseFloat(formData.budget),
+        revenue: formData.revenue ? parseFloat(formData.revenue) : null,
+        jobs: formData.jobs ? parseInt(formData.jobs) : null,
+        profitability: formData.profitability ? parseFloat(formData.profitability) : null,
+        goal: formData.goal?.trim() || null,
+        technology: formData.technology?.trim() || null,
+        impact: formData.impact?.trim() || null,
+        incentives: formData.incentives?.trim() || null,
+        partners: formData.partners?.trim() || null,
+        // Fix publishTime - provide default if empty
+        publishTime: formData.publishTime || "12:00"
+      };
+
+      console.log('Submitting project data:', projectData);
+
+      // Try the main endpoint (should work with updated security config)
+      const response = await fetch('http://localhost:8080/api/projects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(projectData)
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
+      let result;
+      try {
+        result = await response.json();
+        console.log('Response body:', result);
+      } catch (e) {
+        console.error('Failed to parse response as JSON:', e);
+        const text = await response.text();
+        console.log('Response text:', text);
+        setSubmitMessage('❌ Erreur: Réponse invalide du serveur');
+        return;
+      }
+
+      if (response.ok && result.success) {
+        setSubmitMessage('✅ Projet créé avec succès!');
+        console.log('Project created:', result.data);
+        
+        // Reset form after successful submission
+        setTimeout(() => {
+          setFormData({
+            title: '',
+            description: '',
+            sector: '',
+            budget: '',
+            revenue: '',
+            location: '',
+            province: '',
+            jobs: '',
+            profitability: '',
+            goal: '',
+            technology: '',
+            impact: '',
+            incentives: '',
+            partners: '',
+            image: null,
+            publishTime: ''
+          });
+          setImagePreview(null);
+          setSubmitMessage('');
+        }, 3000);
+        
+      } else {
+        console.error('API Error:', result);
+        setSubmitMessage(`❌ Erreur: ${result.error || 'Échec de la soumission'}`);
+      }
+
+    } catch (error) {
+      console.error('Network error:', error);
+      setSubmitMessage('❌ Erreur de connexion au serveur');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -145,6 +247,18 @@ const SubmitProject = () => {
           <div style={styles.formCard}>
             <h2 style={styles.formTitle}>Soumettre un projet</h2>
             
+            {/* Submit Message */}
+            {submitMessage && (
+              <div style={{
+                ...styles.submitMessage,
+                backgroundColor: submitMessage.includes('✅') ? '#d4edda' : '#f8d7da',
+                borderColor: submitMessage.includes('✅') ? '#c3e6cb' : '#f5c6cb',
+                color: submitMessage.includes('✅') ? '#155724' : '#721c24'
+              }}>
+                {submitMessage}
+              </div>
+            )}
+            
             <div style={styles.formContent}>
               {/* Basic Information */}
               <div style={styles.section}>
@@ -159,6 +273,7 @@ const SubmitProject = () => {
                     onChange={handleInputChange}
                     style={{...styles.input, ...(errors.title ? styles.inputError : {})}}
                     placeholder="Ex: Centrale solaire photovoltaïque"
+                    disabled={isSubmitting}
                   />
                   {errors.title && <span style={styles.errorText}>{errors.title}</span>}
                 </div>
@@ -172,6 +287,7 @@ const SubmitProject = () => {
                     style={{...styles.textarea, ...(errors.description ? styles.inputError : {})}}
                     placeholder="Description détaillée du projet..."
                     rows={4}
+                    disabled={isSubmitting}
                   />
                   {errors.description && <span style={styles.errorText}>{errors.description}</span>}
                 </div>
@@ -183,6 +299,7 @@ const SubmitProject = () => {
                     value={formData.sector}
                     onChange={handleInputChange}
                     style={{...styles.select, ...(errors.sector ? styles.inputError : {})}}
+                    disabled={isSubmitting}
                   >
                     <option value="">Sélectionner un secteur</option>
                     {sectors.map((sector, index) => (
@@ -192,17 +309,37 @@ const SubmitProject = () => {
                   {errors.sector && <span style={styles.errorText}>{errors.sector}</span>}
                 </div>
 
-                <div style={styles.fieldGroup}>
-                  <label style={styles.label}>Localisation *</label>
-                  <input
-                    type="text"
-                    name="location"
-                    value={formData.location}
-                    onChange={handleInputChange}
-                    style={{...styles.input, ...(errors.location ? styles.inputError : {})}}
-                    placeholder="Ex: Ouarzazate, Drâa-Tafilalet"
-                  />
-                  {errors.location && <span style={styles.errorText}>{errors.location}</span>}
+                <div style={styles.gridTwo}>
+                  <div style={styles.fieldGroup}>
+                    <label style={styles.label}>Localisation *</label>
+                    <input
+                      type="text"
+                      name="location"
+                      value={formData.location}
+                      onChange={handleInputChange}
+                      style={{...styles.input, ...(errors.location ? styles.inputError : {})}}
+                      placeholder="Ex: Ouarzazate"
+                      disabled={isSubmitting}
+                    />
+                    {errors.location && <span style={styles.errorText}>{errors.location}</span>}
+                  </div>
+
+                  <div style={styles.fieldGroup}>
+                    <label style={styles.label}>Province *</label>
+                    <select
+                      name="province"
+                      value={formData.province}
+                      onChange={handleInputChange}
+                      style={{...styles.select, ...(errors.province ? styles.inputError : {})}}
+                      disabled={isSubmitting}
+                    >
+                      <option value="">Sélectionner une province</option>
+                      {provinces.map((province, index) => (
+                        <option key={index} value={province}>{province}</option>
+                      ))}
+                    </select>
+                    {errors.province && <span style={styles.errorText}>{errors.province}</span>}
+                  </div>
                 </div>
 
                 <div style={styles.fieldGroup}>
@@ -213,6 +350,7 @@ const SubmitProject = () => {
                     value={formData.publishTime}
                     onChange={handleInputChange}
                     style={styles.input}
+                    disabled={isSubmitting}
                   />
                 </div>
               </div>
@@ -232,6 +370,7 @@ const SubmitProject = () => {
                       onChange={handleInputChange}
                       style={{...styles.input, ...(errors.budget ? styles.inputError : {})}}
                       placeholder="12.5"
+                      disabled={isSubmitting}
                     />
                     {errors.budget && <span style={styles.errorText}>{errors.budget}</span>}
                   </div>
@@ -246,6 +385,7 @@ const SubmitProject = () => {
                       onChange={handleInputChange}
                       style={{...styles.input, ...(errors.revenue ? styles.inputError : {})}}
                       placeholder="28.7"
+                      disabled={isSubmitting}
                     />
                     {errors.revenue && <span style={styles.errorText}>{errors.revenue}</span>}
                   </div>
@@ -259,6 +399,7 @@ const SubmitProject = () => {
                       onChange={handleInputChange}
                       style={{...styles.input, ...(errors.jobs ? styles.inputError : {})}}
                       placeholder="45"
+                      disabled={isSubmitting}
                     />
                     {errors.jobs && <span style={styles.errorText}>{errors.jobs}</span>}
                   </div>
@@ -273,6 +414,7 @@ const SubmitProject = () => {
                       onChange={handleInputChange}
                       style={{...styles.input, ...(errors.profitability ? styles.inputError : {})}}
                       placeholder="2.3"
+                      disabled={isSubmitting}
                     />
                     {errors.profitability && <span style={styles.errorText}>{errors.profitability}</span>}
                   </div>
@@ -292,6 +434,7 @@ const SubmitProject = () => {
                     style={styles.textarea}
                     placeholder="Objectif principal du projet..."
                     rows={3}
+                    disabled={isSubmitting}
                   />
                 </div>
 
@@ -304,6 +447,7 @@ const SubmitProject = () => {
                     style={styles.textarea}
                     placeholder="Technologies et méthodes employées..."
                     rows={3}
+                    disabled={isSubmitting}
                   />
                 </div>
 
@@ -316,6 +460,7 @@ const SubmitProject = () => {
                     style={styles.textarea}
                     placeholder="Impact attendu du projet..."
                     rows={3}
+                    disabled={isSubmitting}
                   />
                 </div>
 
@@ -328,6 +473,7 @@ const SubmitProject = () => {
                     style={styles.textarea}
                     placeholder="Incitations ou subventions applicables..."
                     rows={2}
+                    disabled={isSubmitting}
                   />
                 </div>
 
@@ -340,6 +486,7 @@ const SubmitProject = () => {
                     style={styles.textarea}
                     placeholder="Liste des partenaires impliqués dans le projet..."
                     rows={3}
+                    disabled={isSubmitting}
                   />
                 </div>
 
@@ -350,12 +497,21 @@ const SubmitProject = () => {
                     accept="image/*"
                     onChange={handleImageChange}
                     style={styles.fileInput}
+                    disabled={isSubmitting}
                   />
                 </div>
               </div>
 
-              <button onClick={handleSubmit} style={styles.submitButton}>
-                Soumettre le projet
+              <button 
+                onClick={handleSubmit} 
+                style={{
+                  ...styles.submitButton,
+                  opacity: isSubmitting ? 0.7 : 1,
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer'
+                }}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Soumission en cours...' : 'Soumettre le projet'}
               </button>
             </div>
           </div>
@@ -512,7 +668,9 @@ const SubmitProject = () => {
                     <span style={styles.infoIcon}>📍</span>
                     Localisation
                   </h4>
-                  <p style={styles.infoText}>{formData.location || 'Localisation non spécifiée'}</p>
+                  <p style={styles.infoText}>
+                    {formData.location ? `${formData.location}, ${formData.province}` : 'Localisation non spécifiée'}
+                  </p>
                 </div>
                 
                 <div style={styles.infoItem}>
@@ -631,6 +789,14 @@ const styles = {
     marginBottom: '1.5rem',
     borderBottom: '2px solid #8B4513',
     paddingBottom: '0.5rem'
+  },
+  submitMessage: {
+    padding: '1rem',
+    borderRadius: '8px',
+    marginBottom: '1.5rem',
+    border: '1px solid',
+    fontSize: '1rem',
+    fontWeight: '500'
   },
   formContent: {
     display: 'flex',
@@ -962,4 +1128,5 @@ const styles = {
   }
 };
 
+// IMPORTANT: Default export
 export default SubmitProject;
