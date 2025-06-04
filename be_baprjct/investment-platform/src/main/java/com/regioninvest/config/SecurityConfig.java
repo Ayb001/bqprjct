@@ -62,12 +62,10 @@ public class SecurityConfig {
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authz -> authz
-                                // 🔓 TEMPORARY: Allow ALL requests for debugging
-                                .requestMatchers("/**").permitAll()
+                        // 🔓 PUBLIC: Articles API (REAL NEWS) - No auth required
+                        .requestMatchers("/api/articles/**").permitAll()
 
-                        // Once working, replace above with these specific rules:
-                        /*
-                        // 🔓 Public endpoints - No authentication required
+                        // 🔓 PUBLIC: Auth endpoints
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/test/**").permitAll()
@@ -82,6 +80,7 @@ public class SecurityConfig {
 
                         // 🔓 Project READ operations - Anyone can view projects
                         .requestMatchers("GET", "/api/projects/**").permitAll()
+                        .requestMatchers("GET", "/api/sectors/**").permitAll()
 
                         // 🔒 SPECIFIC project endpoints that need auth
                         .requestMatchers("POST", "/api/projects/upload").authenticated()
@@ -91,14 +90,13 @@ public class SecurityConfig {
 
                         // 🔒 All other requests need authentication
                         .anyRequest().authenticated()
-                        */
                 )
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(headers -> headers.frameOptions().sameOrigin()); // For H2 Console
 
-        // TEMPORARILY disable JWT filter for debugging
-        // http.addFilterBefore(jwtRequestFilter(), UsernamePasswordAuthenticationFilter.class);
+        // Re-enable JWT filter for proper security
+        http.addFilterBefore(jwtRequestFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -107,7 +105,12 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 🌐 Allow React development servers
+        // 🌐 Allow React development servers + broader patterns
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+                "http://localhost:*",
+                "http://127.0.0.1:*"
+        ));
+
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
@@ -157,17 +160,13 @@ public class SecurityConfig {
 
         @Override
         protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
-            // TEMPORARILY: Skip ALL requests for debugging
-            return true;
-
-            // Once working, replace above with proper filtering logic:
-            /*
             String path = request.getRequestURI();
             String method = request.getMethod();
 
             // 🔓 Skip JWT processing for public endpoints
             List<String> publicPaths = Arrays.asList(
                     "/api/auth/",
+                    "/api/articles/",  // 🔥 NEW: Skip JWT for articles API
                     "/api/public/",
                     "/api/test/",
                     "/h2-console/",
@@ -189,8 +188,8 @@ public class SecurityConfig {
                 return true;
             }
 
-            // 🔓 Skip JWT for GET requests to projects (anyone can view)
-            if ("GET".equals(method) && path.startsWith("/api/projects")) {
+            // 🔓 Skip JWT for GET requests to projects and sectors (anyone can view)
+            if ("GET".equals(method) && (path.startsWith("/api/projects") || path.startsWith("/api/sectors"))) {
                 return true;
             }
 
@@ -200,7 +199,6 @@ public class SecurityConfig {
             }
 
             return false;
-            */
         }
 
         @Override

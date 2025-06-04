@@ -1,145 +1,123 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const ArticlesPage = () => {
+  const [articles, setArticles] = useState([]);
+  const [filteredArticles, setFilteredArticles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSector, setSelectedSector] = useState('');
-  const [selectedAuthor, setSelectedAuthor] = useState('');
+  const [selectedTag, setSelectedTag] = useState('');
+  const [sectors, setSectors] = useState([]);
+  const [tags, setTags] = useState([]);
+  const [viewMode, setViewMode] = useState('grid');
   const [sortBy, setSortBy] = useState('date-desc');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
 
-  // Mock articles data
-  const mockArticles = [
-    {
-      id: 1,
-      title: "L'avenir de l'énergie solaire au Maroc : Perspectives et défis",
-      content: "Le Maroc continue de développer ses capacités en énergie solaire avec des projets ambitieux comme le complexe solaire Noor à Ouarzazate. Cette initiative représente un tournant majeur dans la stratégie énergétique du royaume...",
-      sector: "Énergie renouvelable – Énergie solaire",
-      author: "Dr. Amina Benali",
-      date: "2025-05-25",
-      readingTime: "8 min",
-      views: 1234,
-      tags: ["énergie solaire", "Maroc", "Noor", "développement durable"],
-      image: "https://images.unsplash.com/photo-1509391366360-2e959784a276?w=400",
-      featured: true
-    },
-    {
-      id: 2,
-      title: "Digitalisation de l'agriculture marocaine : Opportunités et innovations",
-      content: "L'agriculture marocaine connaît une transformation digitale sans précédent. Des capteurs IoT aux drones, en passant par l'intelligence artificielle, découvrez comment la technologie révolutionne ce secteur traditionnel...",
-      sector: "Agriculture",
-      author: "Prof. Hassan Alami",
-      date: "2025-05-20",
-      readingTime: "12 min",
-      views: 987,
-      tags: ["agriculture", "digitalisation", "IoT", "innovation"],
-      image: "https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=400",
-      featured: false
-    },
-    {
-      id: 3,
-      title: "Tourisme durable : Les nouvelles tendances au Maroc",
-      content: "Le secteur touristique marocain s'oriente vers des pratiques plus durables. Entre écotourisme et tourisme culturel responsable, explorez les initiatives qui redéfinissent l'expérience touristique...",
-      sector: "Tourisme",
-      author: "Leila Fassi",
-      date: "2025-05-18",
-      readingTime: "6 min",
-      views: 756,
-      tags: ["tourisme", "durable", "écotourisme", "culture"],
-      image: "https://images.unsplash.com/photo-1539650116574-75c0c6d68488?w=400",
-      featured: true
-    },
-    {
-      id: 4,
-      title: "L'énergie éolienne offshore : Nouveau potentiel pour le Maroc",
-      content: "Avec plus de 3000 km de côtes, le Maroc explore le potentiel de l'énergie éolienne offshore. Cette technologie pourrait révolutionner le mix énergétique national et renforcer l'indépendance énergétique...",
-      sector: "Énergie renouvelable – Énergie éolienne",
-      author: "Dr. Youssef Benomar",
-      date: "2025-05-15",
-      readingTime: "10 min",
-      views: 1456,
-      tags: ["éolien", "offshore", "énergie", "côtes"],
-      image: "https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=400",
-      featured: false
-    },
-    {
-      id: 5,
-      title: "Fintech au Maroc : Révolution des services financiers",
-      content: "Le secteur financier marocain connaît une transformation majeure avec l'émergence des fintechs. Paiements mobiles, crédit alternatif, blockchain : découvrez les innovations qui changent la donne...",
-      sector: "Technologie",
-      author: "Karima Ziadi",
-      date: "2025-05-12",
-      readingTime: "9 min",
-      views: 2103,
-      tags: ["fintech", "technologie", "finance", "innovation"],
-      image: "https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=400",
-      featured: false
-    },
-    {
-      id: 6,
-      title: "Télémédecine au Maroc : Défis et opportunités post-COVID",
-      content: "La pandémie a accéléré l'adoption de la télémédecine au Maroc. Entre réglementation, infrastructure et acceptation sociale, analysons les enjeux de cette révolution sanitaire...",
-      sector: "Santé",
-      author: "Dr. Rachid Ouali",
-      date: "2025-05-10",
-      readingTime: "7 min",
-      views: 834,
-      tags: ["télémédecine", "santé", "digital", "COVID"],
-      image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400",
-      featured: false
-    },
-    {
-      id: 7,
-      title: "L'artisanat marocain à l'ère du e-commerce",
-      content: "L'artisanat traditionnel marocain trouve de nouveaux débouchés grâce au commerce électronique. Comment les artisans s'adaptent-ils aux nouvelles technologies pour préserver et promouvoir leur savoir-faire ?",
-      sector: "Artisanat",
-      author: "Fatima Benali",
-      date: "2025-05-08",
-      readingTime: "5 min",
-      views: 567,
-      tags: ["artisanat", "e-commerce", "tradition", "digital"],
-      image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400",
-      featured: true
-    },
-    {
-      id: 8,
-      title: "Éducation numérique : Transformation du système éducatif marocain",
-      content: "Le Maroc investit massivement dans la digitalisation de son système éducatif. Plateformes d'apprentissage, tablettes numériques, formation des enseignants : point sur cette révolution pédagogique...",
-      sector: "Éducation",
-      author: "Prof. Aicha Lamrani",
-      date: "2025-05-05",
-      readingTime: "11 min",
-      views: 1678,
-      tags: ["éducation", "numérique", "formation", "enseignement"],
-      image: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400",
-      featured: false
-    }
-  ];
+  useEffect(() => {
+    loadArticles();
+    loadSectors();
+    loadTags();
+  }, []);
 
-  const sectors = [
-    'Énergie renouvelable – Énergie solaire',
-    'Énergie renouvelable – Énergie éolienne',
-    'Agriculture',
-    'Tourisme',
-    'Technologie',
-    'Santé',
-    'Éducation',
-    'Artisanat',
-    'Industrie'
-  ];
+  useEffect(() => {
+    filterArticles();
+  }, [articles, searchTerm, selectedSector, selectedTag]);
 
-  const authors = [...new Set(mockArticles.map(article => article.author))];
-
-  // Filter and sort articles
-  const filteredAndSortedArticles = useMemo(() => {
-    let filtered = mockArticles.filter(article => {
-      const matchesSearch = article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           article.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           article.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-      const matchesSector = !selectedSector || article.sector === selectedSector;
-      const matchesAuthor = !selectedAuthor || article.author === selectedAuthor;
+  const loadArticles = async () => {
+    try {
+      setLoading(true);
+      console.log('🔄 Loading articles from API...');
       
-      return matchesSearch && matchesSector && matchesAuthor;
-    });
+      // Try different API URLs in case of configuration issues
+      const apiUrls = [
+        'http://localhost:8080/api/articles',
+        '/api/articles'
+      ];
+      
+      let response = null;
+      let data = null;
+      
+      for (const url of apiUrls) {
+        try {
+          console.log(`🌐 Trying URL: ${url}`);
+          response = await fetch(url);
+          
+          if (response.ok) {
+            data = await response.json();
+            console.log('✅ API Response:', data);
+            break;
+          }
+        } catch (urlError) {
+          console.log(`❌ Failed with URL ${url}:`, urlError.message);
+          continue;
+        }
+      }
+      
+      if (!response || !response.ok) {
+        throw new Error(`HTTP error! status: ${response?.status || 'No response'}`);
+      }
+      
+      if (data && data.success) {
+        setArticles(data.data);
+        setError(null);
+        console.log(`✅ Loaded ${data.data.length} articles`);
+      } else {
+        setError(data?.message || 'Erreur lors du chargement des articles');
+      }
+    } catch (err) {
+      setError('Erreur de connexion au serveur. Vérifiez que le backend Spring Boot est démarré sur localhost:8080');
+      console.error('❌ Articles loading error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSectors = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/articles/sectors');
+      const data = await response.json();
+      if (data.success) {
+        setSectors(data.data);
+      }
+    } catch (err) {
+      console.error('Erreur secteurs:', err);
+    }
+  };
+
+  const loadTags = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/articles/tags');
+      const data = await response.json();
+      if (data.success) {
+        setTags(data.data);
+      }
+    } catch (err) {
+      console.error('Erreur tags:', err);
+    }
+  };
+
+  const filterArticles = () => {
+    let filtered = [...articles];
+
+    if (searchTerm) {
+      filtered = filtered.filter(article =>
+        article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        article.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        article.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+    }
+
+    if (selectedSector) {
+      filtered = filtered.filter(article =>
+        article.sector.toLowerCase().includes(selectedSector.toLowerCase())
+      );
+    }
+
+    if (selectedTag) {
+      filtered = filtered.filter(article =>
+        article.tags.some(tag => tag.toLowerCase().includes(selectedTag.toLowerCase()))
+      );
+    }
 
     // Sort articles
     filtered.sort((a, b) => {
@@ -161,41 +139,45 @@ const ArticlesPage = () => {
       }
     });
 
-    return filtered;
-  }, [mockArticles, searchTerm, selectedSector, selectedAuthor, sortBy]);
+    setFilteredArticles(filtered);
+  };
 
-  const featuredArticles = mockArticles.filter(article => article.featured);
+  const handleTagClick = (tag) => {
+    setSelectedTag(selectedTag === tag ? '' : tag);
+  };
 
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedSector('');
-    setSelectedAuthor('');
+    setSelectedTag('');
     setSortBy('date-desc');
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('fr-FR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
   };
 
+  const featuredArticles = articles.filter(article => article.featured);
+
   const ArticleCard = ({ article, isCompact = false }) => (
-    <div style={isCompact ? styles.compactCard : styles.articleCard}>
-      <div style={styles.imageContainer}>
-        <img 
-          src={article.image} 
-          alt={article.title}
-          style={styles.articleImage}
-        />
-        {article.featured && (
-          <div style={styles.featuredBadge}>
-            ⭐ À la une
-          </div>
-        )}
-      </div>
-      
+    <div 
+      style={isCompact ? styles.compactCard : styles.articleCard}
+      onClick={() => {
+        // 🔥 REAL REDIRECT - Go directly to original article
+        if (article.sourceUrl) {
+          window.open(article.sourceUrl, '_blank');
+        }
+      }}
+    >
       <div style={styles.cardContent}>
         <div style={styles.cardHeader}>
           <span style={styles.sectorTag}>{article.sector}</span>
@@ -212,8 +194,10 @@ const ArticlesPage = () => {
         
         <div style={styles.cardFooter}>
           <div style={styles.authorInfo}>
-            <span style={styles.author}>{article.author}</span>
             <span style={styles.date}>{formatDate(article.date)}</span>
+            {article.sourceName && (
+              <span style={styles.source}>📰 {article.sourceName}</span>
+            )}
           </div>
           <div style={styles.articleStats}>
             <span style={styles.views}>👁️ {article.views}</span>
@@ -221,13 +205,51 @@ const ArticlesPage = () => {
         </div>
         
         <div style={styles.tagsContainer}>
-          {article.tags.slice(0, 3).map((tag, index) => (
-            <span key={index} style={styles.tag}>#{tag}</span>
+          {(article.tags || []).slice(0, 3).map((tag, index) => (
+            <button
+              key={index}
+              style={styles.tag}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleTagClick(tag);
+              }}
+            >
+              #{tag}
+            </button>
           ))}
+        </div>
+
+        <div style={styles.linkIndicator}>
+          <span>🔗 Cliquez pour lire l'article complet</span>
         </div>
       </div>
     </div>
   );
+
+  if (loading) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.loadingContainer}>
+          <div style={styles.loader}></div>
+          <p>Chargement des articles d'investissement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.errorContainer}>
+          <h2>⚠️ Erreur</h2>
+          <p>{error}</p>
+          <button style={styles.retryButton} onClick={loadArticles}>
+            🔄 Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
@@ -301,21 +323,6 @@ const ArticlesPage = () => {
                 </select>
               </div>
 
-              {/* Author Filter */}
-              <div style={styles.filterGroup}>
-                <label style={styles.filterLabel}>Auteur</label>
-                <select
-                  value={selectedAuthor}
-                  onChange={(e) => setSelectedAuthor(e.target.value)}
-                  style={styles.filterSelect}
-                >
-                  <option value="">Tous les auteurs</option>
-                  {authors.map((author, index) => (
-                    <option key={index} value={author}>{author}</option>
-                  ))}
-                </select>
-              </div>
-
               {/* Sort By */}
               <div style={styles.filterGroup}>
                 <label style={styles.filterLabel}>Trier par</label>
@@ -346,11 +353,11 @@ const ArticlesPage = () => {
               <h3 style={styles.sidebarTitle}>📊 Statistiques</h3>
               <div style={styles.statsGrid}>
                 <div style={styles.statItem}>
-                  <span style={styles.statNumber}>{mockArticles.length}</span>
+                  <span style={styles.statNumber}>{articles.length}</span>
                   <span style={styles.statLabel}>Articles totaux</span>
                 </div>
                 <div style={styles.statItem}>
-                  <span style={styles.statNumber}>{filteredAndSortedArticles.length}</span>
+                  <span style={styles.statNumber}>{filteredArticles.length}</span>
                   <span style={styles.statLabel}>Résultats trouvés</span>
                 </div>
                 <div style={styles.statItem}>
@@ -358,8 +365,8 @@ const ArticlesPage = () => {
                   <span style={styles.statLabel}>Secteurs couverts</span>
                 </div>
                 <div style={styles.statItem}>
-                  <span style={styles.statNumber}>{authors.length}</span>
-                  <span style={styles.statLabel}>Contributeurs</span>
+                  <span style={styles.statNumber}>{new Set(articles.map(a => a.sourceName)).size}</span>
+                  <span style={styles.statLabel}>Sources</span>
                 </div>
               </div>
             </div>
@@ -368,11 +375,14 @@ const ArticlesPage = () => {
             <div style={styles.sidebarCard}>
               <h3 style={styles.sidebarTitle}>🏷️ Tags populaires</h3>
               <div style={styles.popularTags}>
-                {['énergie solaire', 'innovation', 'digital', 'durable', 'technologie', 'agriculture'].map((tag, index) => (
+                {tags.slice(0, 6).map((tag, index) => (
                   <button
                     key={index}
-                    style={styles.popularTag}
-                    onClick={() => setSearchTerm(tag)}
+                    style={{
+                      ...styles.popularTag,
+                      ...(selectedTag === tag ? styles.popularTagActive : {})
+                    }}
+                    onClick={() => handleTagClick(tag)}
                   >
                     #{tag}
                   </button>
@@ -386,9 +396,9 @@ const ArticlesPage = () => {
             <div style={styles.contentHeader}>
               <div style={styles.contentInfo}>
                 <h2 style={styles.contentTitle}>
-                  Tous les articles ({filteredAndSortedArticles.length})
+                  Tous les articles ({filteredArticles.length})
                 </h2>
-                {(searchTerm || selectedSector || selectedAuthor) && (
+                {(searchTerm || selectedSector || selectedTag) && (
                   <div style={styles.activeFilters}>
                     <span style={styles.filterInfo}>Filtres actifs:</span>
                     {searchTerm && (
@@ -403,10 +413,10 @@ const ArticlesPage = () => {
                         <button onClick={() => setSelectedSector('')} style={styles.removeFilter}>×</button>
                       </span>
                     )}
-                    {selectedAuthor && (
+                    {selectedTag && (
                       <span style={styles.activeFilter}>
-                        Auteur: {selectedAuthor}
-                        <button onClick={() => setSelectedAuthor('')} style={styles.removeFilter}>×</button>
+                        Tag: {selectedTag}
+                        <button onClick={() => setSelectedTag('')} style={styles.removeFilter}>×</button>
                       </span>
                     )}
                   </div>
@@ -437,7 +447,7 @@ const ArticlesPage = () => {
 
             {/* Articles Grid/List */}
             <div style={viewMode === 'grid' ? styles.articlesGrid : styles.articlesList}>
-              {filteredAndSortedArticles.map(article => (
+              {filteredArticles.map(article => (
                 <ArticleCard 
                   key={article.id} 
                   article={article} 
@@ -446,7 +456,7 @@ const ArticlesPage = () => {
               ))}
             </div>
 
-            {filteredAndSortedArticles.length === 0 && (
+            {filteredArticles.length === 0 && (
               <div style={styles.noResults}>
                 <div style={styles.noResultsIcon}>🔍</div>
                 <h3>Aucun article trouvé</h3>
@@ -652,6 +662,10 @@ const styles = {
     cursor: 'pointer',
     transition: 'background-color 0.3s'
   },
+  popularTagActive: {
+    backgroundColor: '#8B4513',
+    color: 'white'
+  },
   mainContent: {
     display: 'flex',
     flexDirection: 'column',
@@ -744,28 +758,8 @@ const styles = {
     overflow: 'hidden',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
     display: 'flex',
-    height: '200px'
-  },
-  imageContainer: {
-    position: 'relative',
     height: '200px',
-    overflow: 'hidden'
-  },
-  articleImage: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover'
-  },
-  featuredBadge: {
-    position: 'absolute',
-    top: '0.5rem',
-    right: '0.5rem',
-    backgroundColor: '#8B4513',
-    color: 'white',
-    padding: '0.25rem 0.5rem',
-    borderRadius: '12px',
-    fontSize: '0.8rem',
-    fontWeight: 'bold'
+    cursor: 'pointer'
   },
   cardContent: {
     padding: '1.5rem',
@@ -820,14 +814,14 @@ const styles = {
     flexDirection: 'column',
     gap: '0.25rem'
   },
-  author: {
-    fontSize: '0.9rem',
-    fontWeight: '500',
-    color: '#333'
-  },
   date: {
     fontSize: '0.8rem',
     color: '#666'
+  },
+  source: {
+    fontSize: '0.8rem',
+    color: '#666',
+    fontStyle: 'italic'
   },
   articleStats: {
     display: 'flex',
@@ -841,7 +835,8 @@ const styles = {
   tagsContainer: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '0.5rem'
+    gap: '0.5rem',
+    marginBottom: '1rem'
   },
   tag: {
     backgroundColor: '#f8f9fa',
@@ -849,7 +844,19 @@ const styles = {
     padding: '0.25rem 0.5rem',
     borderRadius: '12px',
     fontSize: '0.75rem',
-    fontWeight: '500'
+    fontWeight: '500',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'background-color 0.3s'
+  },
+  linkIndicator: {
+    padding: '0.5rem',
+    backgroundColor: '#f0f8ff',
+    borderRadius: '6px',
+    textAlign: 'center',
+    fontSize: '0.8rem',
+    color: '#0066cc',
+    border: '1px solid #e0e8f0'
   },
   noResults: {
     textAlign: 'center',
@@ -861,6 +868,41 @@ const styles = {
   noResultsIcon: {
     fontSize: '3rem',
     marginBottom: '1rem'
+  },
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '60vh',
+    gap: '1rem'
+  },
+  loader: {
+    width: '40px',
+    height: '40px',
+    border: '4px solid #f3f4f6',
+    borderTop: '4px solid #8B4513',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite'
+  },
+  errorContainer: {
+    textAlign: 'center',
+    padding: '4rem 2rem',
+    backgroundColor: 'white',
+    borderRadius: '16px',
+    boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+    maxWidth: '500px',
+    margin: '0 auto'
+  },
+  retryButton: {
+    padding: '0.75rem 1.5rem',
+    backgroundColor: '#8B4513',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '1rem',
+    marginTop: '1rem'
   }
 };
 

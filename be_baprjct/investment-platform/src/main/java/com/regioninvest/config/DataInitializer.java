@@ -30,6 +30,8 @@ public class DataInitializer implements CommandLineRunner {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    // ✅ SUPPRIMÉ: ArticleRepository (plus besoin car on utilise ArticleService)
+
     @Override
     public void run(String... args) throws Exception {
         System.out.println("🚀 Initialisation des données pour le catalogue de projets...");
@@ -38,6 +40,7 @@ public class DataInitializer implements CommandLineRunner {
         initializeUsers();
         initializeSampleProjects();
         System.out.println("✅ Initialisation terminée!");
+        System.out.println("📰 Les articles d'investissement sont disponibles via ArticleService!");
     }
 
     private void initializeRoles() {

@@ -31,6 +31,20 @@ const Login = () => {
     }, 5000);
   };
 
+  // 🆕 NEW: Role-based redirection function
+  const getRedirectPath = (role) => {
+    switch (role.toUpperCase()) {
+      case 'PORTEUR':
+        return '/project_catalog_porteur';
+      case 'ADMIN':
+        return '/admin'; // Admin dashboard route
+      case 'INVESTISSEUR':
+      case 'USER':
+      default:
+        return '/project_catalog';
+    }
+  };
+
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -59,14 +73,17 @@ const Login = () => {
           role: data.role
         }));
         
-        showMessage(`🎉 Bienvenue ${data.username}! Redirection vers le catalogue...`, 'success');
+        // 🆕 UPDATED: Role-based redirection
+        const redirectPath = getRedirectPath(data.role);
+        
+        showMessage(`🎉 Bienvenue ${data.username}! Redirection vers ${data.role === 'PORTEUR' ? 'votre espace porteur' : 'le catalogue'}...`, 'success');
         
         // Clear form
         setLoginData({ username: '', password: '' });
         
-        // Redirect to project catalog
+        // 🆕 UPDATED: Redirect based on user role
         setTimeout(() => {
-          navigate('/project_catalog');
+          navigate(redirectPath);
         }, 2000);
       } else {
         // Show specific error messages
