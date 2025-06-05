@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -35,36 +36,45 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
         try {
+            // 🔐 Authenticate using email
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             loginRequest.getEmail(),
                             loginRequest.getPassword()
                     )
             );
+
+            // Load user details by email
             final UserDetails userDetails = userService.loadUserByEmail(loginRequest.getEmail());
+            final String jwt = jwtUtil.generateToken(userDetails);
+
+            // Get user by email
+            User user = userService.findByEmail(loginRequest.getEmail()).orElseThrow();
+
+            System.out.println("✅ Successful login: " + user.getUsername() + " (" + user.getRole().getName() + ") at " + java.time.LocalDateTime.now());
+
+            return ResponseEntity.ok(new AuthResponse(
+                    jwt,
+                    user.getUsername(),
+                    user.getEmail(),
+                    user.getRole().getName()
+            ));
+
         } catch (BadCredentialsException e) {
             Map<String, String> error = new HashMap<>();
-            error.put("error", "Invalid username or password");
+            error.put("error", "Invalid email or password");
             return ResponseEntity.badRequest().body(error);
+
+        } catch (DisabledException e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Account is disabled. Please contact administrator.");
+            return ResponseEntity.badRequest().body(error);
+
         } catch (Exception e) {
             Map<String, String> error = new HashMap<>();
             error.put("error", "Authentication failed");
             return ResponseEntity.badRequest().body(error);
         }
-
-        final UserDetails userDetails = userService.loadUserByUsername(loginRequest.getUsername());
-        final String jwt = jwtUtil.generateToken(userDetails);
-
-        User user = userService.findByUsername(loginRequest.getUsername()).orElseThrow();
-
-        System.out.println("✅ Successful login: " + user.getUsername() + " at " + java.time.LocalDateTime.now());
-
-        return ResponseEntity.ok(new AuthResponse(
-                jwt,
-                user.getUsername(),
-                user.getEmail(),
-                user.getRole().getName()
-        ));
     }
 
     @PostMapping("/register")
@@ -78,6 +88,7 @@ public class AuthController {
             response.put("message", "Account created successfully! Please log in with your credentials.");
             response.put("username", user.getUsername());
             response.put("email", user.getEmail());
+            response.put("role", user.getRole().getName());
             response.put("created_at", user.getCreatedAt());
 
             return ResponseEntity.ok(response);
@@ -101,6 +112,14 @@ public class AuthController {
             if (jwtUtil.validateToken(jwt)) {
                 String username = jwtUtil.extractUsername(jwt);
                 User user = userService.findByUsername(username).orElseThrow();
+
+                // Check if user is still enabled
+                if (!user.getIsEnabled()) {
+                    Map<String, Object> error = new HashMap<>();
+                    error.put("valid", false);
+                    error.put("error", "Account is disabled");
+                    return ResponseEntity.badRequest().body(error);
+                }
 
                 Map<String, Object> response = new HashMap<>();
                 response.put("valid", true);
@@ -141,6 +160,36 @@ public class AuthController {
             Map<String, String> response = new HashMap<>();
             response.put("message", "Logout completed");
             return ResponseEntity.ok(response);
+        }
+    }
+
+    /**
+     * 🆕 NEW: Get current user info
+     */
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser(@RequestHeader("Authorization") String token) {
+        try {
+            String jwt = token.replace("Bearer ", "");
+
+            if (!jwtUtil.validateToken(jwt)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid token"));
+            }
+
+            String username = jwtUtil.extractUsername(jwt);
+            User user = userService.findByUsername(username).orElseThrow();
+
+            Map<String, Object> userInfo = new HashMap<>();
+            userInfo.put("id", user.getId());
+            userInfo.put("username", user.getUsername());
+            userInfo.put("email", user.getEmail());
+            userInfo.put("role", user.getRole().getName());
+            userInfo.put("enabled", user.getIsEnabled());
+            userInfo.put("createdAt", user.getCreatedAt());
+
+            return ResponseEntity.ok(userInfo);
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to get user info"));
         }
     }
 }

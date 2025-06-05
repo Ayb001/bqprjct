@@ -17,6 +17,7 @@ const Login = () => {
   const [messageType, setMessageType] = useState(''); // 'success', 'error', 'info'
   const [loading, setLoading] = useState(false);
 
+
   // 🚨 FIXED API URL
   const API_BASE_URL = 'http://localhost:8080/api/auth';
 

@@ -42,6 +42,21 @@ public class UserService implements UserDetailsService {
     }
 
     /**
+     * 🆕 NEW: Load user by email for authentication
+     */
+    public UserDetails loadUserByEmail(String email) throws UsernameNotFoundException {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+
+        // Check if user is enabled
+        if (!user.getIsEnabled()) {
+            throw new org.springframework.security.authentication.DisabledException("User account is disabled: " + email);
+        }
+
+        return user;
+    }
+
+    /**
      * Register user with default USER role
      */
     public User registerUser(RegisterRequest request) {
