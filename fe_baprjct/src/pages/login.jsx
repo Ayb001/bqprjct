@@ -5,7 +5,7 @@ const Login = () => {
   const navigate = useNavigate();
   
   const [loginData, setLoginData] = useState({
-    username: '',
+    email: '',
     password: ''
   });
   const [registerData, setRegisterData] = useState({
@@ -31,17 +31,30 @@ const Login = () => {
     }, 5000);
   };
 
-  // 🆕 NEW: Role-based redirection function
+  // 🆕 UPDATED: Role-based redirection function
   const getRedirectPath = (role) => {
     switch (role.toUpperCase()) {
+      case 'ADMIN':
       case 'PORTEUR':
         return '/project_catalog_porteur';
-      case 'ADMIN':
-        return '/admin'; // Admin dashboard route
-      case 'INVESTISSEUR':
       case 'USER':
+      case 'INVESTISSEUR':
       default:
         return '/project_catalog';
+    }
+  };
+
+  // 🆕 UPDATED: Get user-friendly role display name
+  const getRoleDisplayName = (role) => {
+    switch (role.toUpperCase()) {
+      case 'ADMIN':
+        return 'espace administrateur';
+      case 'PORTEUR':
+        return 'espace porteur de projet';
+      case 'USER':
+      case 'INVESTISSEUR':
+      default:
+        return 'catalogue des projets';
     }
   };
 
@@ -57,7 +70,7 @@ const Login = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          username: loginData.username,
+          email: loginData.email,
           password: loginData.password
         }),
       });
@@ -65,7 +78,7 @@ const Login = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Store JWT token
+        // Store JWT token and user info
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify({
           username: data.username,
@@ -73,13 +86,17 @@ const Login = () => {
           role: data.role
         }));
         
-        // 🆕 UPDATED: Role-based redirection
+        // 🆕 UPDATED: Get redirect path and display name
         const redirectPath = getRedirectPath(data.role);
+        const roleDisplay = getRoleDisplayName(data.role);
         
-        showMessage(`🎉 Bienvenue ${data.username}! Redirection vers ${data.role === 'PORTEUR' ? 'votre espace porteur' : 'le catalogue'}...`, 'success');
+        showMessage(
+          `🎉 Bienvenue ${data.username}! Redirection vers ${roleDisplay}...`, 
+          'success'
+        );
         
         // Clear form
-        setLoginData({ username: '', password: '' });
+        setLoginData({ email: '', password: '' });
         
         // 🆕 UPDATED: Redirect based on user role
         setTimeout(() => {
@@ -88,7 +105,7 @@ const Login = () => {
       } else {
         // Show specific error messages
         if (data.error && data.error.includes('Invalid')) {
-          showMessage('❌ Nom d\'utilisateur ou mot de passe incorrect. Veuillez réessayer.', 'error');
+          showMessage('❌ Adresse e-mail ou mot de passe incorrect. Veuillez réessayer.', 'error');
         } else {
           showMessage(`❌ ${data.error || 'Erreur de connexion'}`, 'error');
         }
@@ -202,12 +219,12 @@ const Login = () => {
               <form onSubmit={handleLoginSubmit}>
                 <div className="login-input-boxes">
                   <div className="login-input-box">
-                    <i className="fas fa-user"></i>
+                    <i className="fas fa-envelope"></i>
                     <input 
-                      type="text" 
-                      placeholder="Nom d'utilisateur" 
-                      value={loginData.username}
-                      onChange={(e) => setLoginData({...loginData, username: e.target.value})}
+                      type="email" 
+                      placeholder="Adresse e-mail" 
+                      value={loginData.email}
+                      onChange={(e) => setLoginData({...loginData, email: e.target.value})}
                       required 
                     />
                   </div>

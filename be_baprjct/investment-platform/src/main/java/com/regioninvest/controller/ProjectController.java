@@ -5,10 +5,6 @@ import com.regioninvest.dto.ProjectCreateRequest;
 import com.regioninvest.dto.ProjectResponse;
 import com.regioninvest.dto.ApiResponse;
 import com.regioninvest.service.ProjectService;
-import com.regioninvest.repository.UserRepository;
-import com.regioninvest.repository.SectorRepository;
-import com.regioninvest.entity.User;
-import com.regioninvest.entity.Sector;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
@@ -22,7 +18,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/projects")
@@ -31,12 +26,6 @@ public class ProjectController {
 
     @Autowired
     private ProjectService projectService;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private SectorRepository sectorRepository;
 
     /**
      * GET /api/projects - Récupérer tous les projets avec filtrage et pagination
@@ -91,115 +80,19 @@ public class ProjectController {
     }
 
     /**
-     * GET /api/projects/{id}/similar - Récupérer des projets similaires
-     */
-    @GetMapping("/{id}/similar")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getSimilarProjects(
-            @PathVariable Long id,
-            @RequestParam(defaultValue = "3") int limit) {
-
-        try {
-            Map<String, Object> similarProjects = projectService.getSimilarProjects(id, limit);
-            return ResponseEntity.ok(ApiResponse.success(similarProjects, "Projets similaires récupérés avec succès"));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Erreur lors de la récupération des projets similaires: " + e.getMessage()));
-        }
-    }
-
-    /**
-     * 🔧 DEBUG ENDPOINT - No auth required for debugging
-     */
-    @PostMapping("/debug-create")
-    public ResponseEntity<ApiResponse<String>> debugCreateProject(
-            @Valid @RequestBody ProjectCreateRequest request,
-            Authentication authentication) {
-
-        try {
-            // Debug current user info
-            String username = authentication != null ? authentication.getName() : "ANONYMOUS";
-            System.out.println("🔍 DEBUG: Username = " + username);
-
-            if (authentication != null) {
-                System.out.println("🔍 DEBUG: Authorities = " + authentication.getAuthorities());
-                System.out.println("🔍 DEBUG: Principal = " + authentication.getPrincipal().getClass().getSimpleName());
-            }
-
-            // Check if user exists
-            Optional<User> userOpt = userRepository.findByUsername(username);
-            if (userOpt.isPresent()) {
-                User user = userOpt.get();
-                System.out.println("🔍 DEBUG: User found");
-                System.out.println("🔍 DEBUG: User role = " + user.getRole().getName());
-                System.out.println("🔍 DEBUG: User authorities in UserDetails = " + user.getAuthorities());
-
-                // Check if user has PORTEUR role
-                boolean hasPorteurRole = user.getAuthorities().stream()
-                        .anyMatch(auth -> auth.getAuthority().equals("ROLE_PORTEUR"));
-                System.out.println("🔍 DEBUG: Has ROLE_PORTEUR = " + hasPorteurRole);
-
-            } else {
-                System.out.println("❌ DEBUG: User NOT found");
-            }
-
-            // Test sector lookup
-            String sectorName = request.getSector();
-            Optional<Sector> sectorOpt = sectorRepository.findByName(sectorName);
-            System.out.println("🔍 DEBUG: Sector '" + sectorName + "' found = " + sectorOpt.isPresent());
-
-            return ResponseEntity.ok(ApiResponse.success("Debug info logged", "Check console for details"));
-
-        } catch (Exception e) {
-            System.out.println("❌ DEBUG ERROR: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Debug error: " + e.getMessage()));
-        }
-    }
-
-    /**
-     * 🚨 TEMPORARY - Public project creation for testing
-     */
-    @PostMapping("/public-create")
-    public ResponseEntity<ApiResponse<ProjectDTO>> createProjectPublic(
-            @Valid @RequestBody ProjectCreateRequest request) {
-
-        try {
-            System.out.println("🔓 PUBLIC: Creating project: " + request.getTitle());
-
-            // Force use porteur1 for testing
-            ProjectDTO createdProject = projectService.createProject(request, null, "porteur1");
-
-            System.out.println("✅ PUBLIC: Project created with ID: " + createdProject.getId());
-
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(ApiResponse.success(createdProject, "Project created successfully (public)"));
-
-        } catch (Exception e) {
-            System.err.println("❌ PUBLIC ERROR: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Error creating project: " + e.getMessage()));
-        }
-    }
-
-    /**
-     * POST /api/projects - Créer un nouveau projet (Porteur seulement)
-     * ✅ TEMPORARILY REMOVED @PreAuthorize FOR TESTING
+     * POST /api/projects - Créer un nouveau projet (ADMIN et PORTEUR seulement)
      */
     @PostMapping
-    // @PreAuthorize("hasRole('PORTEUR')")  // ✅ TEMPORARILY COMMENTED OUT
+    @PreAuthorize("hasRole('ADMIN') or hasRole('PORTEUR')")
     public ResponseEntity<ApiResponse<ProjectDTO>> createProject(
             @Valid @RequestBody ProjectCreateRequest request,
             Authentication authentication) {
 
         try {
-            String username = authentication != null ? authentication.getName() : "porteur1";
-            System.out.println("🔍 CREATE: Username = " + username);
-
-            // For React frontend, we handle image upload separately
-            // This endpoint accepts JSON only, image upload can be done via separate endpoint
+            String username = authentication.getName();
             ProjectDTO createdProject = projectService.createProject(request, null, username);
+
+            System.out.println("✅ Project created: " + createdProject.getTitle() + " by " + username);
 
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(ApiResponse.success(createdProject, "Projet créé avec succès"));
@@ -208,18 +101,17 @@ public class ProjectController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.error("Données invalides: " + e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace(); // For debugging
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("Erreur lors de la création du projet: " + e.getMessage()));
         }
     }
 
     /**
-     * POST /api/projects/upload - Upload project with image (multipart)
-     * ✅ NEW ENDPOINT for React file uploads
+     * POST /api/projects/upload - Upload project with image (ADMIN et PORTEUR seulement)
      */
     @PostMapping("/upload")
-    @PreAuthorize("hasRole('PORTEUR')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('PORTEUR')")
     public ResponseEntity<ApiResponse<ProjectDTO>> createProjectWithImage(
             @Valid @RequestPart("project") ProjectCreateRequest request,
             @RequestPart(value = "image", required = false) MultipartFile image,
@@ -229,6 +121,8 @@ public class ProjectController {
             String username = authentication.getName();
             ProjectDTO createdProject = projectService.createProject(request, image, username);
 
+            System.out.println("✅ Project with image created: " + createdProject.getTitle() + " by " + username);
+
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(ApiResponse.success(createdProject, "Projet créé avec succès"));
 
@@ -236,17 +130,17 @@ public class ProjectController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.error("Données invalides: " + e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace(); // For debugging
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("Erreur lors de la création du projet: " + e.getMessage()));
         }
     }
 
     /**
-     * PUT /api/projects/{id} - Modifier un projet (Porteur propriétaire seulement)
+     * PUT /api/projects/{id} - Modifier un projet (ADMIN ou propriétaire PORTEUR)
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('PORTEUR')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('PORTEUR')")
     public ResponseEntity<ApiResponse<ProjectDTO>> updateProject(
             @PathVariable Long id,
             @Valid @RequestPart("project") ProjectCreateRequest request,
@@ -256,6 +150,8 @@ public class ProjectController {
         try {
             String username = authentication.getName();
             ProjectDTO updatedProject = projectService.updateProject(id, request, image, username);
+
+            System.out.println("✅ Project updated: " + updatedProject.getTitle() + " by " + username);
 
             return ResponseEntity.ok(ApiResponse.success(updatedProject, "Projet mis à jour avec succès"));
 
@@ -269,17 +165,21 @@ public class ProjectController {
     }
 
     /**
-     * DELETE /api/projects/{id} - Supprimer un projet (Porteur propriétaire seulement)
+     * DELETE /api/projects/{id} - Supprimer un projet (ADMIN ou propriétaire PORTEUR)
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('PORTEUR')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('PORTEUR')")
     public ResponseEntity<ApiResponse<String>> deleteProject(
             @PathVariable Long id,
             Authentication authentication) {
 
         try {
             String username = authentication.getName();
+            String projectTitle = projectService.getProjectById(id).getTitle(); // Get title before deletion
+
             projectService.deleteProject(id, username);
+
+            System.out.println("✅ Project deleted: " + projectTitle + " by " + username);
 
             return ResponseEntity.ok(ApiResponse.success(null, "Projet supprimé avec succès"));
 
@@ -289,6 +189,29 @@ public class ProjectController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("Erreur lors de la suppression du projet: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * GET /api/projects/my - Projets du porteur connecté (ADMIN et PORTEUR)
+     */
+    @GetMapping("/my")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('PORTEUR')")
+    public ResponseEntity<ApiResponse<ProjectResponse>> getMyProjects(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            Authentication authentication) {
+
+        try {
+            String username = authentication.getName();
+            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+            ProjectResponse response = projectService.getProjectsByPorteur(username, pageable);
+
+            return ResponseEntity.ok(ApiResponse.success(response, "Vos projets récupérés avec succès"));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Erreur lors de la récupération de vos projets: " + e.getMessage()));
         }
     }
 
@@ -314,6 +237,23 @@ public class ProjectController {
     }
 
     /**
+     * GET /api/projects/{id}/similar - Récupérer des projets similaires
+     */
+    @GetMapping("/{id}/similar")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getSimilarProjects(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "3") int limit) {
+
+        try {
+            Map<String, Object> similarProjects = projectService.getSimilarProjects(id, limit);
+            return ResponseEntity.ok(ApiResponse.success(similarProjects, "Projets similaires récupérés avec succès"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Erreur lors de la récupération des projets similaires: " + e.getMessage()));
+        }
+    }
+
+    /**
      * GET /api/projects/stats - Statistiques des projets
      */
     @GetMapping("/stats")
@@ -324,29 +264,6 @@ public class ProjectController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("Erreur lors de la récupération des statistiques: " + e.getMessage()));
-        }
-    }
-
-    /**
-     * GET /api/projects/my - Projets du porteur connecté
-     */
-    @GetMapping("/my")
-    @PreAuthorize("hasRole('PORTEUR')")
-    public ResponseEntity<ApiResponse<ProjectResponse>> getMyProjects(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            Authentication authentication) {
-
-        try {
-            String username = authentication.getName();
-            Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-            ProjectResponse response = projectService.getProjectsByPorteur(username, pageable);
-
-            return ResponseEntity.ok(ApiResponse.success(response, "Vos projets récupérés avec succès"));
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Erreur lors de la récupération de vos projets: " + e.getMessage()));
         }
     }
 

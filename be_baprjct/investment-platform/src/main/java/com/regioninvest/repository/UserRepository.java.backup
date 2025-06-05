@@ -1,0 +1,252 @@
+package com.regioninvest.repository;
+
+import com.regioninvest.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+
+    // Original methods
+    Optional<User> findByUsername(String username);
+    Optional<User> findByEmail(String email);
+    Boolean existsByUsername(String username);
+    Boolean existsByEmail(String email);
+    Optional<User> findByResetToken(String resetToken);
+
+    // ============= ADMIN MANAGEMENT QUERIES =============
+
+    /**
+     * Find users by role name
+     */
+    Page<User> findByRole_Name(String roleName, Pageable pageable);
+
+    /**
+     * Count users by role name
+     */
+    long countByRole_Name(String roleName);
+
+    /**
+     * Find users by username or email containing (case insensitive search)
+     */
+    Page<User> findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(
+            String username, String email, Pageable pageable);
+
+    /**
+     * Find users by enabled status
+     */
+    Page<User> findByIsEnabled(Boolean isEnabled, Pageable pageable);
+
+    /**
+     * Count active users
+     */
+    long countByIsEnabledTrue();
+
+    /**
+     * Count inactive users
+     */
+    long countByIsEnabledFalse();
+
+    /**
+     * Find recent users (last N users created)
+     */
+    List<User> findTop5ByOrderByCreatedAtDesc();
+
+    /**
+     * Find users created after a specific date
+     */
+    long countByCreatedAtAfter(LocalDateTime date);
+
+    /**
+     * Find users by role and enabled status
+     */
+    Page<User> findByRole_NameAndIsEnabled(String roleName, Boolean isEnabled, Pageable pageable);
+
+    /**
+     * Advanced search with multiple criteria
+     */
+    @Query("SELECT u FROM User u WHERE " +
+            "(:search IS NULL OR :search = '' OR " +
+            " LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            " LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+            "(:roleName IS NULL OR :roleName = '' OR u.role.name = :roleName) AND " +
+            "(:enabled IS NULL OR u.isEnabled = :enabled)")
+    Page<User> findUsersWithFilters(@Param("search") String search,
+                                    @Param("roleName") String roleName,
+                                    @Param("enabled") Boolean enabled,
+                                    Pageable pageable);
+
+    /**
+     * Get user statistics by role
+     */
+    @Query("SELECT u.role.name, COUNT(u), " +
+            "SUM(CASE WHEN u.isEnabled = true THEN 1 ELSE 0 END), " +
+            "SUM(CASE WHEN u.isEnabled = false THEN 1 ELSE 0 END) " +
+            "FROM User u GROUP BY u.role.name")
+    List<Object[]> getUserStatsByRole();
+
+    /**
+     * Find users with projects
+     */
+    @Query("SELECT DISTINCT u FROM User u " +
+            "JOIN Project p ON p.porteur.id = u.id " +
+            "WHERE p.status = :projectStatus")
+    Page<User> findUsersWithProjects(@Param("projectStatus") com.regioninvest.entity.ProjectStatus projectStatus,
+                                     Pageable pageable);
+
+    /**
+     * Find users without projects
+     */
+    @Query("SELECT u FROM User u WHERE u.role.name = 'PORTEUR' AND u.id NOT IN " +
+            "(SELECT DISTINCT p.porteur.id FROM Project p WHERE p.status = :projectStatus)")
+    Page<User> findPorteursWithoutProjects(@Param("projectStatus") com.regioninvest.entity.ProjectStatus projectStatus,
+                                           Pageable pageable);
+
+    /**
+     * Count projects by user
+     */
+    @Query("SELECT u.id, u.username, COUNT(p) FROM User u " +
+            "LEFT JOIN Project p ON p.porteur.id = u.id AND p.status = :projectStatus " +
+            "WHERE u.role.name = 'PORTEUR' " +
+            "GROUP BY u.id, u.username " +
+            "ORDER BY COUNT(p) DESC")
+    List<Object[]> getProjectCountByPorteur(@Param("projectStatus") com.regioninvest.entity.ProjectStatus projectStatus);
+
+    /**
+     * Find users created between dates
+     */
+    Page<User> findByCreatedAtBetween(LocalDateTime startDate, LocalDateTime endDate, Pageable pageable);
+
+    /**
+     * Find users by multiple roles
+     */
+    @Query("SELECT u FROM User u WHERE u.role.name IN :roleNames")
+    Page<User> findByRoleNames(@Param("roleNames") List<String> roleNames, Pageable pageable);
+
+    /**
+     * Find users for bulk operations
+     */
+    @Query("SELECT u FROM User u WHERE u.id IN :userIds")
+    List<User> findByIdIn(@Param("userIds") List<Long> userIds);
+
+    /**
+     * Check if user has any active projects
+     */
+    @Query("SELECT COUNT(p) > 0 FROM Project p WHERE p.porteur.id = :userId AND p.status = :status")
+    boolean hasActiveProjects(@Param("userId") Long userId,
+                              @Param("status") com.regioninvest.entity.ProjectStatus status);
+
+    /**
+     * Get users with most projects
+     */
+    @Query("SELECT u FROM User u " +
+            "LEFT JOIN Project p ON p.porteur.id = u.id AND p.status = :projectStatus " +
+            "WHERE u.role.name = 'PORTEUR' " +
+            "GROUP BY u.id " +
+            "ORDER BY COUNT(p) DESC")
+    Page<User> findTopPorteursByProjectCount(@Param("projectStatus") com.regioninvest.entity.ProjectStatus projectStatus,
+                                             Pageable pageable);
+
+    /**
+     * Find recently active users (based on updatedAt)
+     */
+    Page<User> findByUpdatedAtAfterOrderByUpdatedAtDesc(LocalDateTime date, Pageable pageable);
+
+    /**
+     * Find inactive users (not updated recently)
+     */
+    Page<User> findByUpdatedAtBeforeAndIsEnabledTrue(LocalDateTime date, Pageable pageable);
+}
+
+// ===============================================
+
+/**
+ * AuditLog Repository
+ */
+@Repository
+interface AuditLogRepository extends JpaRepository<com.regioninvest.entity.AuditLog, Long> {
+
+    /**
+     * Find audit logs by action
+     */
+    Page<com.regioninvest.entity.AuditLog> findByActionOrderByTimestampDesc(String action, Pageable pageable);
+
+    /**
+     * Find audit logs by entity type
+     */
+    Page<com.regioninvest.entity.AuditLog> findByEntityTypeOrderByTimestampDesc(String entityType, Pageable pageable);
+
+    /**
+     * Find audit logs by action and entity type
+     */
+    Page<com.regioninvest.entity.AuditLog> findByActionAndEntityTypeOrderByTimestampDesc(
+            String action, String entityType, Pageable pageable);
+
+    /**
+     * Find audit logs by performed by (user)
+     */
+    Page<com.regioninvest.entity.AuditLog> findByPerformedByOrderByTimestampDesc(String performedBy, Pageable pageable);
+
+    /**
+     * Find audit logs by entity ID
+     */
+    Page<com.regioninvest.entity.AuditLog> findByEntityIdOrderByTimestampDesc(Long entityId, Pageable pageable);
+
+    /**
+     * Find all audit logs ordered by timestamp desc
+     */
+    Page<com.regioninvest.entity.AuditLog> findAllByOrderByTimestampDesc(Pageable pageable);
+
+    /**
+     * Find audit logs between dates
+     */
+    Page<com.regioninvest.entity.AuditLog> findByTimestampBetweenOrderByTimestampDesc(
+            LocalDateTime startDate, LocalDateTime endDate, Pageable pageable);
+
+    /**
+     * Find recent audit logs for a specific entity
+     */
+    @Query("SELECT a FROM AuditLog a WHERE a.entityType = :entityType AND a.entityId = :entityId " +
+            "ORDER BY a.timestamp DESC")
+    List<com.regioninvest.entity.AuditLog> findRecentLogsByEntity(
+            @Param("entityType") String entityType,
+            @Param("entityId") Long entityId,
+            Pageable pageable);
+
+    /**
+     * Count audit logs by action
+     */
+    long countByAction(String action);
+
+    /**
+     * Count audit logs by user
+     */
+    long countByPerformedBy(String performedBy);
+
+    /**
+     * Find security-related audit logs
+     */
+    @Query("SELECT a FROM AuditLog a WHERE a.action LIKE 'SECURITY_%' ORDER BY a.timestamp DESC")
+    Page<com.regioninvest.entity.AuditLog> findSecurityLogs(Pageable pageable);
+
+    /**
+     * Get audit statistics
+     */
+    @Query("SELECT a.action, COUNT(a) FROM AuditLog a GROUP BY a.action ORDER BY COUNT(a) DESC")
+    List<Object[]> getAuditStatsByAction();
+
+    /**
+     * Get user activity statistics
+     */
+    @Query("SELECT a.performedBy, COUNT(a) FROM AuditLog a " +
+            "WHERE a.timestamp >= :since GROUP BY a.performedBy ORDER BY COUNT(a) DESC")
+    List<Object[]> getUserActivityStats(@Param("since") LocalDateTime since);
+}

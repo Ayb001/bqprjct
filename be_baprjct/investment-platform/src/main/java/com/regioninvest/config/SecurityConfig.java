@@ -39,7 +39,7 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return new BCryptPasswordEncoder(12);
     }
 
     @Bean
@@ -62,10 +62,8 @@ public class SecurityConfig {
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authz -> authz
-                        // 🔓 PUBLIC: Articles API (REAL NEWS) - No auth required
+                        // 🔓 PUBLIC: Articles API and auth endpoints
                         .requestMatchers("/api/articles/**").permitAll()
-
-                        // 🔓 PUBLIC: Auth endpoints
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/test/**").permitAll()
@@ -73,29 +71,22 @@ public class SecurityConfig {
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
 
-                        // 🔓 SPECIFIC public project endpoints
-                        .requestMatchers("/api/projects/public-create").permitAll()
-                        .requestMatchers("/api/projects/debug-create").permitAll()
-                        .requestMatchers("POST", "/api/projects").permitAll()
-
                         // 🔓 Project READ operations - Anyone can view projects
                         .requestMatchers("GET", "/api/projects/**").permitAll()
                         .requestMatchers("GET", "/api/sectors/**").permitAll()
 
-                        // 🔒 SPECIFIC project endpoints that need auth
-                        .requestMatchers("POST", "/api/projects/upload").authenticated()
-                        .requestMatchers("PUT", "/api/projects/**").authenticated()
-                        .requestMatchers("DELETE", "/api/projects/**").authenticated()
-                        .requestMatchers("GET", "/api/projects/my").authenticated()
+                        // 🔒 PROJECT MANAGEMENT: Only ADMIN and PORTEUR
+                        .requestMatchers("POST", "/api/projects/**").hasAnyRole("ADMIN", "PORTEUR")
+                        .requestMatchers("PUT", "/api/projects/**").hasAnyRole("ADMIN", "PORTEUR")
+                        .requestMatchers("DELETE", "/api/projects/**").hasAnyRole("ADMIN", "PORTEUR")
 
                         // 🔒 All other requests need authentication
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .headers(headers -> headers.frameOptions().sameOrigin()); // For H2 Console
+                .headers(headers -> headers.frameOptions().disable()); // Fixed deprecated method
 
-        // Re-enable JWT filter for proper security
         http.addFilterBefore(jwtRequestFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -105,7 +96,6 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 🌐 Allow React development servers + broader patterns
         configuration.setAllowedOriginPatterns(Arrays.asList(
                 "http://localhost:*",
                 "http://127.0.0.1:*"
@@ -117,18 +107,12 @@ public class SecurityConfig {
                 "http://localhost:3001"
         ));
 
-        // Allow all HTTP methods
         configuration.setAllowedMethods(Arrays.asList(
                 "GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"
         ));
 
-        // Allow all headers (including Authorization)
         configuration.setAllowedHeaders(Arrays.asList("*"));
-
-        // 🔑 IMPORTANT: Enable credentials for JWT tokens
         configuration.setAllowCredentials(true);
-
-        // Cache preflight for 1 hour
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -166,7 +150,7 @@ public class SecurityConfig {
             // 🔓 Skip JWT processing for public endpoints
             List<String> publicPaths = Arrays.asList(
                     "/api/auth/",
-                    "/api/articles/",  // 🔥 NEW: Skip JWT for articles API
+                    "/api/articles/",
                     "/api/public/",
                     "/api/test/",
                     "/h2-console/",
@@ -178,23 +162,8 @@ public class SecurityConfig {
                 return true;
             }
 
-            // 🔓 Specific public project endpoints
-            List<String> publicProjectEndpoints = Arrays.asList(
-                    "/api/projects/public-create",
-                    "/api/projects/debug-create"
-            );
-
-            if (publicProjectEndpoints.stream().anyMatch(path::equals)) {
-                return true;
-            }
-
-            // 🔓 Skip JWT for GET requests to projects and sectors (anyone can view)
+            // 🔓 Skip JWT for GET requests to projects and sectors
             if ("GET".equals(method) && (path.startsWith("/api/projects") || path.startsWith("/api/sectors"))) {
-                return true;
-            }
-
-            // 🔓 Skip JWT for main project creation (temporarily)
-            if ("POST".equals(method) && path.equals("/api/projects")) {
                 return true;
             }
 
@@ -217,8 +186,6 @@ public class SecurityConfig {
                 } catch (Exception e) {
                     logger.error("JWT Token extraction failed: " + e.getMessage());
                 }
-            } else {
-                logger.debug("No JWT token found in request header");
             }
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {

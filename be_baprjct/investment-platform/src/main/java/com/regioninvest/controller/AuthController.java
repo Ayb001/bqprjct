@@ -35,13 +35,13 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
         try {
-            // 🔐 Enhanced security: Authenticate user credentials
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
-                            loginRequest.getUsername(),
+                            loginRequest.getEmail(),
                             loginRequest.getPassword()
                     )
             );
+            final UserDetails userDetails = userService.loadUserByEmail(loginRequest.getEmail());
         } catch (BadCredentialsException e) {
             Map<String, String> error = new HashMap<>();
             error.put("error", "Invalid username or password");
@@ -57,7 +57,6 @@ public class AuthController {
 
         User user = userService.findByUsername(loginRequest.getUsername()).orElseThrow();
 
-        // 📊 Log successful login (optional - for security monitoring)
         System.out.println("✅ Successful login: " + user.getUsername() + " at " + java.time.LocalDateTime.now());
 
         return ResponseEntity.ok(new AuthResponse(
@@ -71,13 +70,10 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest registerRequest) {
         try {
-            // 🔐 SECURITY ENHANCEMENT: Just create user, don't auto-login
             User user = userService.registerUser(registerRequest);
 
-            // 📊 Log successful registration (optional - for security monitoring)
             System.out.println("✅ New user registered: " + user.getUsername() + " at " + java.time.LocalDateTime.now());
 
-            // 🔐 Return success message WITHOUT JWT token
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Account created successfully! Please log in with your credentials.");
             response.put("username", user.getUsername());
@@ -132,11 +128,6 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<?> logout(@RequestHeader("Authorization") String token) {
         try {
-            // 🔐 In a production environment, you might want to:
-            // 1. Add token to a blacklist
-            // 2. Log the logout event
-            // 3. Clear any server-side sessions
-
             String jwt = token.replace("Bearer ", "");
             String username = jwtUtil.extractUsername(jwt);
 
