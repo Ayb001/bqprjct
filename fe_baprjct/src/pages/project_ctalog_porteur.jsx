@@ -32,6 +32,18 @@ const ProjectCatalogPorteur = () => {
     budgetRanges: ["Tous les budgets"]
   });
 
+  // Handle logout function
+  const handleLogout = () => {
+    // Clear all authentication tokens
+    localStorage.removeItem('token');
+    localStorage.removeItem('jwt');
+    localStorage.removeItem('user');
+    localStorage.removeItem('userRole');
+    
+    // Redirect to home or login page
+    window.location.href = '/';
+  };
+
   // Fetch projects from backend
   const fetchProjects = async (page = 0) => {
     try {
@@ -244,13 +256,14 @@ const ProjectCatalogPorteur = () => {
         <div className="header-content">
           <div className="logo-section">
             <div className="logo">🏛️</div>
-            <h1>Banque de projets - Porteur</h1>
+            <h1>Banque de projets</h1>
           </div>
           <nav className="main-nav">
-            <a href="/project_catalog" className="nav-link">Catalogue Public</a>
-            <a href="/project_catalog_porteur" className="nav-link active">Mes Projets</a>
-            <a href="/submit_page" className="nav-link">Nouveau Projet</a>
-            <a href="#" className="nav-link">Profil</a>
+            <a href="/project_catalog_porteur" className="nav-link">📊 Projets</a>
+            <a href="/submit_page" className="nav-link">➕ Nouveau Projet</a>
+            <a href="/article_page" className="nav-link">📰 Articles</a>
+            <a href="/porteur_dashboard" className="nav-link">📈 Dashboard</a>
+            <button onClick={handleLogout} className="nav-link logout-btn">🚪 Déconnexion</button>
           </nav>
         </div>
       </header>
@@ -538,7 +551,7 @@ const ProjectCatalogPorteur = () => {
   );
 };
 
-// Styles (keeping all existing styles + adding new ones for delete/modify buttons)
+// Updated styles with logout button styling
 const catalogStyles = `
   * {
     margin: 0;
@@ -648,7 +661,8 @@ const catalogStyles = `
 
   .main-nav {
     display: flex;
-    gap: 2rem;
+    gap: 1rem;
+    align-items: center;
   }
 
   .nav-link {
@@ -658,6 +672,11 @@ const catalogStyles = `
     border-radius: 8px;
     transition: all 0.3s ease;
     font-weight: 500;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
   }
 
   .nav-link:hover,
@@ -665,6 +684,17 @@ const catalogStyles = `
     background: rgba(255,255,255,0.2);
     color: white;
     backdrop-filter: blur(10px);
+  }
+
+  .logout-btn {
+    background: rgba(220, 53, 69, 0.2) !important;
+    border: 1px solid rgba(220, 53, 69, 0.3);
+  }
+
+  .logout-btn:hover {
+    background: rgba(220, 53, 69, 0.3) !important;
+    color: white;
+    transform: translateY(-1px);
   }
 
   /* Hero Section */
@@ -1234,9 +1264,14 @@ const catalogStyles = `
     }
 
     .main-nav {
-      gap: 1rem;
+      gap: 0.5rem;
       flex-wrap: wrap;
       justify-content: center;
+    }
+
+    .nav-link {
+      font-size: 0.9rem;
+      padding: 0.4rem 0.8rem;
     }
 
     .hero-content h2 {
@@ -1341,6 +1376,15 @@ const catalogStyles = `
     .project-title {
       font-size: 1.1rem;
     }
+
+    .main-nav {
+      gap: 0.25rem;
+    }
+
+    .nav-link {
+      font-size: 0.8rem;
+      padding: 0.3rem 0.6rem;
+    }
   }
 
   /* Animation enhancements */
@@ -1372,5 +1416,4 @@ const catalogStyles = `
     outline-offset: 2px;
   }
 `;
-
 export default ProjectCatalogPorteur;
