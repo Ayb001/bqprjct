@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Upload, FileText, ImageIcon } from 'lucide-react';
 
 const SubmitProject = () => {
   const [formData, setFormData] = useState({
@@ -17,11 +18,13 @@ const SubmitProject = () => {
     incentives: '',
     partners: '',
     image: null,
+    pdfFile: null,
     publishTime: ''
   });
 
   const [errors, setErrors] = useState({});
   const [imagePreview, setImagePreview] = useState(null);
+  const [pdfFileName, setPdfFileName] = useState('');
   const [showImageModal, setShowImageModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
@@ -47,6 +50,18 @@ const SubmitProject = () => {
     'Zagora'
   ];
 
+  // Handle logout function
+  const handleLogout = () => {
+    // Clear all authentication tokens
+    localStorage.removeItem('token');
+    localStorage.removeItem('jwt');
+    localStorage.removeItem('user');
+    localStorage.removeItem('userRole');
+    
+    // Redirect to home or login page
+    window.location.href = '/';
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -65,6 +80,18 @@ const SubmitProject = () => {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Veuillez sélectionner un fichier image valide.');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('La taille de l\'image ne doit pas dépasser 5MB.');
+        return;
+      }
+
       setFormData(prev => ({
         ...prev,
         image: file
@@ -75,6 +102,29 @@ const SubmitProject = () => {
         setImagePreview(e.target.result);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePdfChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      if (file.type !== 'application/pdf') {
+        alert('Veuillez sélectionner un fichier PDF valide.');
+        return;
+      }
+      
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('La taille du PDF ne doit pas dépasser 10MB.');
+        return;
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        pdfFile: file
+      }));
+      setPdfFileName(file.name);
     }
   };
 
@@ -114,7 +164,13 @@ const SubmitProject = () => {
     setSubmitMessage('');
 
     try {
-      // Prepare the data for the backend
+      // Get JWT token from localStorage
+      const token = localStorage.getItem('token') || localStorage.getItem('jwt');
+      
+      // Create FormData for multipart form data
+      const formDataToSend = new FormData();
+      
+      // Create project JSON object as required by backend
       const projectData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
@@ -130,23 +186,49 @@ const SubmitProject = () => {
         impact: formData.impact?.trim() || null,
         incentives: formData.incentives?.trim() || null,
         partners: formData.partners?.trim() || null,
-        // Fix publishTime - provide default if empty
         publishTime: formData.publishTime || "12:00"
       };
 
+      // Add the project data as JSON part (as expected by backend)
+      formDataToSend.append('project', new Blob([JSON.stringify(projectData)], {type: 'application/json'}));
+      
+      // Add files if present
+      if (formData.image) {
+        formDataToSend.append('image', formData.image);
+      }
+      if (formData.pdfFile) {
+        formDataToSend.append('pdfFile', formData.pdfFile);
+      }
+
       console.log('Submitting project data:', projectData);
 
-      // Try the main endpoint (should work with updated security config)
-      const response = await fetch('http://localhost:8080/api/projects', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(projectData)
-      });
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      // Try the main projects endpoint first
+      let response;
+      try {
+        response = await fetch('http://localhost:8080/api/projects', {
+          method: 'POST',
+          headers: headers,
+          body: formDataToSend
+        });
+      } catch (error) {
+        // If multipart fails, try JSON endpoint
+        console.log('Multipart failed, trying JSON...');
+        response = await fetch('http://localhost:8080/api/projects', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify(projectData)
+        });
+      }
 
       console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
 
       let result;
       try {
@@ -160,9 +242,9 @@ const SubmitProject = () => {
         return;
       }
 
-      if (response.ok && result.success) {
+      if (response.ok && (result.success || result.id)) {
         setSubmitMessage('✅ Projet créé avec succès!');
-        console.log('Project created:', result.data);
+        console.log('Project created:', result);
         
         // Reset form after successful submission
         setTimeout(() => {
@@ -182,15 +264,17 @@ const SubmitProject = () => {
             incentives: '',
             partners: '',
             image: null,
+            pdfFile: null,
             publishTime: ''
           });
           setImagePreview(null);
+          setPdfFileName('');
           setSubmitMessage('');
         }, 3000);
         
       } else {
         console.error('API Error:', result);
-        setSubmitMessage(`❌ Erreur: ${result.error || 'Échec de la soumission'}`);
+        setSubmitMessage(`❌ Erreur: ${result.message || result.error || 'Échec de la soumission'}`);
       }
 
     } catch (error) {
@@ -223,23 +307,23 @@ const SubmitProject = () => {
 
   return (
     <div style={styles.container}>
-      {/* Navigation */}
-      <nav style={styles.nav}>
-        <div style={styles.navContainer}>
-          <div style={styles.navBrand}>
-            <div style={styles.logo}>
-              <div style={styles.logoIcon}>🏛️</div>
-            </div>
-            <span style={styles.brandText}>Banque de projets</span>
+      {/* Updated Navigation with same design as catalog */}
+      <header style={styles.catalogHeader}>
+        <div style={styles.headerContent}>
+          <div style={styles.logoSection}>
+            <div style={styles.logo}>🏛️</div>
+            <h1 style={styles.headerTitle}>Banque de projets - Porteur</h1>
           </div>
-          <div style={styles.navLinks}>
-            <a href="#" style={styles.navLink}>Accueil</a>
-            <a href="#" style={styles.navLink}>Rechercher</a>
-            <a href="#" style={styles.navLink}>À propos</a>
-            <a href="#" style={styles.navLink}>Contact</a>
-          </div>
+          <nav style={styles.mainNav}>
+            <a href="/project_catalog" style={styles.navLink}>📊 Projets</a>
+            <a href="/submit_page" style={{...styles.navLink, ...styles.activeNavLink}}>➕ Nouveau Projet</a>
+            <a href="/articles" style={styles.navLink}>📰 Articles</a>
+            <a href="/dashboard" style={styles.navLink}>📈 Dashboard</a>
+            <a href="/rendezvous" style={styles.navLink}>📅 Rendez-vous</a>
+            <button onClick={handleLogout} style={styles.logoutBtn}>🚪 Déconnexion</button>
+          </nav>
         </div>
-      </nav>
+      </header>
 
       <div style={styles.mainContainer}>
         <div style={styles.gridContainer}>
@@ -421,6 +505,60 @@ const SubmitProject = () => {
                 </div>
               </div>
 
+              {/* Files Upload Section */}
+              <div style={styles.section}>
+                <h3 style={styles.sectionTitle}>Fichiers du projet</h3>
+                
+                <div style={styles.gridTwo}>
+                  <div style={styles.fieldGroup}>
+                    <label style={styles.label}>Image du projet</label>
+                    <div style={styles.fileUploadContainer}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        style={styles.hiddenFileInput}
+                        id="image-upload"
+                        disabled={isSubmitting}
+                      />
+                      <label htmlFor="image-upload" style={styles.fileUploadLabel}>
+                        <ImageIcon size={20} />
+                        <span>{formData.image ? formData.image.name : 'Choisir une image'}</span>
+                      </label>
+                      {imagePreview && (
+                        <div style={styles.imagePreviewContainer}>
+                          <img src={imagePreview} alt="Preview" style={styles.imagePreviewThumb} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={styles.fieldGroup}>
+                    <label style={styles.label}>Fiche projet (PDF)</label>
+                    <div style={styles.fileUploadContainer}>
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={handlePdfChange}
+                        style={styles.hiddenFileInput}
+                        id="pdf-upload"
+                        disabled={isSubmitting}
+                      />
+                      <label htmlFor="pdf-upload" style={styles.fileUploadLabel}>
+                        <FileText size={20} />
+                        <span>{pdfFileName || 'Choisir un PDF'}</span>
+                      </label>
+                      {pdfFileName && (
+                        <div style={styles.pdfIndicator}>
+                          <FileText size={16} />
+                          <span>{pdfFileName}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Additional Details */}
               <div style={styles.section}>
                 <h3 style={styles.sectionTitle}>Détails supplémentaires</h3>
@@ -489,17 +627,6 @@ const SubmitProject = () => {
                     disabled={isSubmitting}
                   />
                 </div>
-
-                <div style={styles.fieldGroup}>
-                  <label style={styles.label}>Image du projet</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    style={styles.fileInput}
-                    disabled={isSubmitting}
-                  />
-                </div>
               </div>
 
               <button 
@@ -537,23 +664,8 @@ const SubmitProject = () => {
                   </div>
                   <div style={styles.metaItem}>
                     <span style={styles.metaIcon}>👁️</span>
-                    <span>245 vues</span>
+                    <span>0 vues</span>
                   </div>
-                </div>
-                
-                <div style={styles.actionButtons}>
-                  <button style={styles.primaryButton}>
-                    <span style={styles.buttonIcon}>📥</span>
-                    Télécharger la fiche projet
-                  </button>
-                  <button style={styles.secondaryButton}>
-                    <span style={styles.buttonIcon}>📤</span>
-                    Partager
-                  </button>
-                  <button style={styles.secondaryButton}>
-                    <span style={styles.buttonIcon}>🖨️</span>
-                    Imprimer
-                  </button>
                 </div>
               </div>
 
@@ -580,6 +692,17 @@ const SubmitProject = () => {
                   <div style={styles.zoomIndicator}>🔍</div>
                 )}
               </div>
+
+              {/* PDF File Indicator */}
+              {pdfFileName && (
+                <div style={styles.pdfSection}>
+                  <h4 style={styles.subHeading}>📄 Fiche projet disponible</h4>
+                  <div style={styles.pdfDownloadBox}>
+                    <FileText size={24} />
+                    <span>{pdfFileName}</span>
+                  </div>
+                </div>
+              )}
 
               {/* Economic Data */}
               <div style={styles.economicGrid}>
@@ -684,11 +807,6 @@ const SubmitProject = () => {
                     {formData.partners || 'Les partenaires du projet seront affichés ici.'}
                   </p>
                 </div>
-                
-                <div style={styles.infoItem}>
-                  <h4 style={styles.subHeading}>Articles connexes</h4>
-                  <p style={styles.infoText}>Les articles connexes seront affichés ici.</p>
-                </div>
               </div>
             </div>
           </div>
@@ -714,67 +832,109 @@ const SubmitProject = () => {
   );
 };
 
+// Updated styles with catalog design
 const styles = {
   container: {
     minHeight: '100vh',
-    backgroundColor: '#f5f5f5',
-    fontFamily: 'Arial, sans-serif'
+    backgroundColor: '#f8f9fa',
+    fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif'
   },
-  nav: {
-    backgroundColor: '#8B4513',
-    color: 'white',
-    padding: '1rem 1.5rem',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+  
+  // Header styles matching catalog design exactly
+  catalogHeader: {
+    background: 'linear-gradient(135deg, #8B4513 0%, #A0522D 100%)',
+    boxShadow: '0 2px 20px rgba(0,0,0,0.1)',
+    position: 'sticky',
+    top: 0,
+    zIndex: 100,
+    padding: '0.75rem 0'
   },
-  navContainer: {
-    maxWidth: '1200px',
+  
+  headerContent: {
+    maxWidth: '1400px',
     margin: '0 auto',
+    padding: '0 2rem',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    flexWrap: 'wrap'
+    minHeight: '60px'
   },
-  navBrand: {
+  
+  logoSection: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.75rem'
+    gap: '1rem'
   },
+  
   logo: {
+    fontSize: '1.8rem',
+    background: 'rgba(255,255,255,0.2)',
+    padding: '0.4rem',
+    borderRadius: '10px',
+    backdropFilter: 'blur(10px)'
+  },
+  
+  headerTitle: {
+    color: 'white',
+    fontSize: '1.3rem',
+    fontWeight: '600',
+    margin: 0
+  },
+  
+  mainNav: {
     display: 'flex',
+    gap: '0.75rem',
     alignItems: 'center'
   },
-  logoIcon: {
-    fontSize: '1.5rem',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    padding: '0.5rem',
-    borderRadius: '8px'
-  },
-  brandText: {
-    fontSize: '1.25rem',
-    fontWeight: 'bold'
-  },
-  navLinks: {
-    display: 'flex',
-    gap: '1.5rem',
-    flexWrap: 'wrap'
-  },
+  
   navLink: {
-    color: 'white',
+    color: 'rgba(255,255,255,0.9)',
     textDecoration: 'none',
-    padding: '0.5rem 1rem',
+    padding: '0.4rem 0.8rem',
     borderRadius: '6px',
-    transition: 'background-color 0.3s'
+    transition: 'all 0.3s ease',
+    fontWeight: '500',
+    border: 'none',
+    background: 'none',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    fontSize: '0.9rem',
+    whiteSpace: 'nowrap'
   },
+  
+  activeNavLink: {
+    background: 'rgba(255,255,255,0.2)',
+    color: 'white',
+    backdropFilter: 'blur(10px)'
+  },
+  
+  logoutBtn: {
+    color: 'rgba(255,255,255,0.9)',
+    textDecoration: 'none',
+    padding: '0.4rem 0.8rem',
+    borderRadius: '6px',
+    transition: 'all 0.3s ease',
+    fontWeight: '500',
+    border: '1px solid rgba(220, 53, 69, 0.3)',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    fontSize: '0.9rem',
+    background: 'rgba(220, 53, 69, 0.2)',
+    whiteSpace: 'nowrap'
+  },
+  
   mainContainer: {
     maxWidth: '1400px',
     margin: '0 auto',
     padding: '2rem 1rem'
   },
+  
   gridContainer: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: '2rem'
   },
+  
   formCard: {
     backgroundColor: 'white',
     borderRadius: '12px',
@@ -782,6 +942,7 @@ const styles = {
     padding: '1.5rem',
     height: 'fit-content'
   },
+  
   formTitle: {
     fontSize: '1.75rem',
     fontWeight: 'bold',
@@ -790,6 +951,7 @@ const styles = {
     borderBottom: '2px solid #8B4513',
     paddingBottom: '0.5rem'
   },
+  
   submitMessage: {
     padding: '1rem',
     borderRadius: '8px',
@@ -798,16 +960,19 @@ const styles = {
     fontSize: '1rem',
     fontWeight: '500'
   },
+  
   formContent: {
     display: 'flex',
     flexDirection: 'column',
     gap: '1.5rem'
   },
+  
   section: {
     display: 'flex',
     flexDirection: 'column',
     gap: '1rem'
   },
+  
   sectionTitle: {
     fontSize: '1.25rem',
     fontWeight: '600',
@@ -815,16 +980,19 @@ const styles = {
     borderBottom: '1px solid #ddd',
     paddingBottom: '0.5rem'
   },
+  
   fieldGroup: {
     display: 'flex',
     flexDirection: 'column',
     gap: '0.5rem'
   },
+  
   label: {
     fontSize: '0.9rem',
     fontWeight: '500',
     color: '#333'
   },
+  
   input: {
     padding: '0.75rem',
     border: '1px solid #ddd',
@@ -832,6 +1000,7 @@ const styles = {
     fontSize: '1rem',
     transition: 'border-color 0.3s'
   },
+  
   textarea: {
     padding: '0.75rem',
     border: '1px solid #ddd',
@@ -841,6 +1010,7 @@ const styles = {
     fontFamily: 'inherit',
     transition: 'border-color 0.3s'
   },
+  
   select: {
     padding: '0.75rem',
     border: '1px solid #ddd',
@@ -849,25 +1019,70 @@ const styles = {
     backgroundColor: 'white',
     transition: 'border-color 0.3s'
   },
-  fileInput: {
-    padding: '0.75rem',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '1rem',
-    backgroundColor: 'white'
-  },
+  
   inputError: {
     borderColor: '#dc3545'
   },
+  
   errorText: {
     color: '#dc3545',
     fontSize: '0.875rem'
   },
+  
   gridTwo: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: '1rem'
   },
+  
+  // File upload styles
+  fileUploadContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.5rem'
+  },
+  
+  hiddenFileInput: {
+    display: 'none'
+  },
+  
+  fileUploadLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.75rem',
+    border: '2px dashed #ddd',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    backgroundColor: '#f8f9fa',
+    color: '#666',
+    fontWeight: '500'
+  },
+  
+  imagePreviewContainer: {
+    marginTop: '0.5rem'
+  },
+  
+  imagePreviewThumb: {
+    width: '60px',
+    height: '60px',
+    objectFit: 'cover',
+    borderRadius: '4px',
+    border: '1px solid #ddd'
+  },
+  
+  pdfIndicator: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.5rem',
+    backgroundColor: '#e3f2fd',
+    borderRadius: '4px',
+    fontSize: '0.9rem',
+    color: '#1976d2'
+  },
+  
   submitButton: {
     backgroundColor: '#8B4513',
     color: 'white',
@@ -879,6 +1094,8 @@ const styles = {
     cursor: 'pointer',
     transition: 'background-color 0.3s'
   },
+  
+  // Preview styles
   previewCard: {
     backgroundColor: 'white',
     borderRadius: '12px',
@@ -886,42 +1103,50 @@ const styles = {
     padding: '1.5rem',
     height: 'fit-content'
   },
+  
   previewHeader: {
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
     marginBottom: '1.5rem'
   },
+  
   previewIcon: {
     fontSize: '1.25rem'
   },
+  
   previewTitle: {
     fontSize: '1.75rem',
     fontWeight: 'bold',
     color: '#333'
   },
+  
   previewContent: {
     display: 'flex',
     flexDirection: 'column',
     gap: '1.5rem'
   },
+  
   projectHeader: {
     display: 'flex',
     flexDirection: 'column',
     gap: '1rem'
   },
+  
   projectTitle: {
     fontSize: '1.75rem',
     fontWeight: 'bold',
     color: '#333',
     marginBottom: '0.5rem'
   },
+  
   projectMeta: {
     display: 'flex',
     flexWrap: 'wrap',
     gap: '1rem',
     marginBottom: '1rem'
   },
+  
   metaItem: {
     display: 'flex',
     alignItems: 'center',
@@ -929,46 +1154,15 @@ const styles = {
     fontSize: '0.9rem',
     color: '#666'
   },
+  
   metaIcon: {
     fontSize: '1rem'
   },
-  actionButtons: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '0.5rem'
-  },
-  primaryButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    backgroundColor: '#8B4513',
-    color: 'white',
-    padding: '0.5rem 1rem',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '0.875rem',
-    cursor: 'pointer',
-    transition: 'background-color 0.3s'
-  },
-  secondaryButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    backgroundColor: '#6c757d',
-    color: 'white',
-    padding: '0.5rem 1rem',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '0.875rem',
-    cursor: 'pointer',
-    transition: 'background-color 0.3s'
-  },
-  buttonIcon: {
-    fontSize: '0.875rem'
-  },
+  
   imageContainer: {
     position: 'relative'
   },
+  
   imagePreview: {
     width: '100%',
     height: '200px',
@@ -981,20 +1175,24 @@ const styles = {
     transition: 'background-color 0.3s',
     overflow: 'hidden'
   },
+  
   previewImage: {
     width: '100%',
     height: '100%',
     objectFit: 'cover',
     borderRadius: '8px'
   },
+  
   imagePlaceholder: {
     textAlign: 'center',
     color: '#6c757d'
   },
+  
   placeholderIcon: {
     fontSize: '2rem',
     marginBottom: '0.5rem'
   },
+  
   zoomIndicator: {
     position: 'absolute',
     top: '0.5rem',
@@ -1005,17 +1203,38 @@ const styles = {
     borderRadius: '4px',
     fontSize: '0.875rem'
   },
+  
+  pdfSection: {
+    padding: '1rem',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '8px',
+    border: '1px solid #e9ecef'
+  },
+  
+  pdfDownloadBox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.75rem',
+    backgroundColor: 'white',
+    borderRadius: '6px',
+    border: '1px solid #ddd',
+    color: '#333'
+  },
+  
   economicGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: '1rem'
   },
+  
   economicCard: {
     backgroundColor: '#f8f9fa',
     padding: '1rem',
     borderRadius: '8px',
     border: '1px solid #e9ecef'
   },
+  
   economicHeader: {
     display: 'flex',
     alignItems: 'center',
@@ -1024,20 +1243,24 @@ const styles = {
     fontSize: '0.9rem',
     color: '#666'
   },
+  
   economicIcon: {
     fontSize: '1rem'
   },
+  
   economicValue: {
     fontSize: '1.25rem',
     fontWeight: 'bold',
     color: '#333',
     margin: 0
   },
+  
   descriptionSection: {
     display: 'flex',
     flexDirection: 'column',
     gap: '1rem'
   },
+  
   sectionHeading: {
     fontSize: '1.25rem',
     fontWeight: '600',
@@ -1045,41 +1268,49 @@ const styles = {
     borderBottom: '1px solid #ddd',
     paddingBottom: '0.5rem'
   },
+  
   descriptionItem: {
     marginBottom: '1rem'
   },
+  
   subHeading: {
     fontSize: '1rem',
     fontWeight: '600',
     color: '#555',
     marginBottom: '0.5rem'
   },
+  
   descriptionText: {
     fontSize: '0.95rem',
     lineHeight: '1.6',
     color: '#333',
     margin: 0
   },
+  
   additionalSection: {
     display: 'flex',
     flexDirection: 'column',
     gap: '1rem'
   },
+  
   infoItem: {
     display: 'flex',
     flexDirection: 'column',
     gap: '0.5rem'
   },
+  
   infoIcon: {
     fontSize: '1rem',
     marginRight: '0.25rem'
   },
+  
   infoText: {
     fontSize: '0.95rem',
     lineHeight: '1.6',
     color: '#333',
     margin: 0
   },
+  
   modal: {
     position: 'fixed',
     top: 0,
@@ -1093,40 +1324,21 @@ const styles = {
     zIndex: 1000,
     cursor: 'pointer'
   },
+  
   modalContent: {
     maxWidth: '90%',
     maxHeight: '90%',
     position: 'relative'
   },
+  
   modalImage: {
     width: '100%',
     height: 'auto',
     maxHeight: '90vh',
     objectFit: 'contain',
     borderRadius: '8px'
-  },
-  // Media queries for responsive design
-  '@media (max-width: 1024px)': {
-    gridContainer: {
-      gridTemplateColumns: '1fr',
-      gap: '1.5rem'
-    }
-  },
-  '@media (max-width: 768px)': {
-    gridTwo: {
-      gridTemplateColumns: '1fr'
-    },
-    economicGrid: {
-      gridTemplateColumns: '1fr'
-    },
-    navLinks: {
-      display: 'none'
-    },
-    actionButtons: {
-      flexDirection: 'column'
-    }
   }
 };
 
-// IMPORTANT: Default export
 export default SubmitProject;
+            
