@@ -167,10 +167,13 @@ const SubmitProject = () => {
       // Get JWT token from localStorage
       const token = localStorage.getItem('token') || localStorage.getItem('jwt');
       
-      // Create FormData for multipart form data
-      const formDataToSend = new FormData();
-      
-      // Create project JSON object as required by backend
+      if (!token) {
+        setSubmitMessage('❌ Vous devez être connecté pour soumettre un projet');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Create project data object
       const projectData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
@@ -178,108 +181,168 @@ const SubmitProject = () => {
         location: formData.location.trim(),
         province: formData.province,
         budget: parseFloat(formData.budget),
-        revenue: formData.revenue ? parseFloat(formData.revenue) : null,
-        jobs: formData.jobs ? parseInt(formData.jobs) : null,
-        profitability: formData.profitability ? parseFloat(formData.profitability) : null,
-        goal: formData.goal?.trim() || null,
-        technology: formData.technology?.trim() || null,
-        impact: formData.impact?.trim() || null,
-        incentives: formData.incentives?.trim() || null,
-        partners: formData.partners?.trim() || null,
-        publishTime: formData.publishTime || "12:00"
+        revenue: formData.revenue ? parseFloat(formData.revenue) : 0,
+        jobs: formData.jobs ? parseInt(formData.jobs) : 0,
+        profitability: formData.profitability ? parseFloat(formData.profitability) : 0,
+        goal: formData.goal?.trim() || "",
+        technology: formData.technology?.trim() || "",
+        impact: formData.impact?.trim() || "",
+        incentives: formData.incentives?.trim() || "",
+        partners: formData.partners?.trim() || "",
+        publishTime: formData.publishTime || "12:00",
+        category: "TRADITIONAL_CRAFTS"
       };
 
-      // Add the project data as JSON part (as expected by backend)
-      formDataToSend.append('project', new Blob([JSON.stringify(projectData)], {type: 'application/json'}));
-      
-      // Add files if present
-      if (formData.image) {
-        formDataToSend.append('image', formData.image);
-      }
-      if (formData.pdfFile) {
-        formDataToSend.append('pdfFile', formData.pdfFile);
-      }
+      console.log('🚀 Submitting project data:', projectData);
 
-      console.log('Submitting project data:', projectData);
-
-      const headers = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      // Try the main projects endpoint first
       let response;
-      try {
-        response = await fetch('http://localhost:8080/api/projects', {
+      
+      // Check if we have files to upload
+      if (formData.image || formData.pdfFile) {
+        console.log('📂 Using multipart upload endpoint...');
+        
+        const formDataToSend = new FormData();
+        
+        // Add project data as JSON string (not Blob)
+        formDataToSend.append('project', JSON.stringify(projectData));
+        
+        // Add files
+        if (formData.image) {
+          formDataToSend.append('image', formData.image);
+        }
+        if (formData.pdfFile) {
+          formDataToSend.append('pdfFile', formData.pdfFile);
+        }
+
+        response = await fetch('http://localhost:8080/api/projects/upload', {
           method: 'POST',
-          headers: headers,
+          headers: {
+            'Authorization': `Bearer ${token}`
+            // DO NOT set Content-Type - let browser handle multipart boundaries
+          },
           body: formDataToSend
         });
-      } catch (error) {
-        // If multipart fails, try JSON endpoint
-        console.log('Multipart failed, trying JSON...');
+        
+      } else {
+        console.log('📝 Using JSON endpoint (no files)...');
+        
         response = await fetch('http://localhost:8080/api/projects', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify(projectData)
         });
       }
 
-      console.log('Response status:', response.status);
+      console.log('📡 Response status:', response.status);
 
+      // Handle response
       let result;
       try {
-        result = await response.json();
-        console.log('Response body:', result);
+        const responseText = await response.text();
+        console.log('📄 Raw response:', responseText);
+        
+        if (responseText) {
+          result = JSON.parse(responseText);
+        } else {
+          result = {};
+        }
+        console.log('📋 Parsed response:', result);
       } catch (e) {
-        console.error('Failed to parse response as JSON:', e);
-        const text = await response.text();
-        console.log('Response text:', text);
+        console.error('❌ Failed to parse response as JSON:', e);
         setSubmitMessage('❌ Erreur: Réponse invalide du serveur');
         return;
       }
 
-      if (response.ok && (result.success || result.id)) {
-        setSubmitMessage('✅ Projet créé avec succès!');
-        console.log('Project created:', result);
-        
-        // Reset form after successful submission
-        setTimeout(() => {
-          setFormData({
-            title: '',
-            description: '',
-            sector: '',
-            budget: '',
-            revenue: '',
-            location: '',
-            province: '',
-            jobs: '',
-            profitability: '',
-            goal: '',
-            technology: '',
-            impact: '',
-            incentives: '',
-            partners: '',
-            image: null,
-            pdfFile: null,
-            publishTime: ''
-          });
-          setImagePreview(null);
-          setPdfFileName('');
-          setSubmitMessage('');
-        }, 3000);
-        
+      if (response.ok) {
+        // Success cases
+        if (result.success || result.data || response.status === 201) {
+          setSubmitMessage('✅ Projet créé avec succès!');
+          console.log('✅ Project created successfully:', result);
+          
+          // Reset form after successful submission
+          setTimeout(() => {
+            setFormData({
+              title: '',
+              description: '',
+              sector: '',
+              budget: '',
+              revenue: '',
+              location: '',
+              province: '',
+              jobs: '',
+              profitability: '',
+              goal: '',
+              technology: '',
+              impact: '',
+              incentives: '',
+              partners: '',
+              image: null,
+              pdfFile: null,
+              publishTime: ''
+            });
+            setImagePreview(null);
+            setPdfFileName('');
+            setSubmitMessage('');
+          }, 3000);
+          
+        } else {
+          console.error('❌ Unexpected success response format:', result);
+          setSubmitMessage(`❌ Erreur: ${result.message || result.error || 'Réponse inattendue'}`);
+        }
+
       } else {
-        console.error('API Error:', result);
-        setSubmitMessage(`❌ Erreur: ${result.message || result.error || 'Échec de la soumission'}`);
+        // Error cases
+        console.error('❌ API Error:', result);
+        let errorMessage = 'Échec de la soumission';
+        
+        // Handle different error types
+        if (result && result.error) {
+          errorMessage = result.error;
+        } else if (result && result.message) {
+          errorMessage = result.message;
+        } else {
+          // Handle specific HTTP status codes
+          switch (response.status) {
+            case 400:
+              errorMessage = 'Données de projet invalides. Vérifiez tous les champs.';
+              break;
+            case 401:
+              errorMessage = 'Non autorisé. Veuillez vous reconnecter.';
+              break;
+            case 403:
+              errorMessage = 'Accès refusé. Vous devez être un porteur de projet.';
+              break;
+            case 413:
+              errorMessage = 'Fichier trop volumineux. Réduisez la taille des fichiers.';
+              break;
+            case 415:
+              errorMessage = 'Format de fichier non supporté.';
+              break;
+            case 500:
+              errorMessage = 'Erreur serveur. Veuillez réessayer plus tard.';
+              break;
+            default:
+              errorMessage = `Erreur ${response.status}: ${response.statusText}`;
+          }
+        }
+        
+        setSubmitMessage(`❌ Erreur: ${errorMessage}`);
       }
 
     } catch (error) {
-      console.error('Network error:', error);
-      setSubmitMessage('❌ Erreur de connexion au serveur');
+      console.error('❌ Network/Connection error:', error);
+      
+      // Handle different types of network errors
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        setSubmitMessage('❌ Erreur de connexion. Vérifiez que le serveur est démarré sur le port 8080.');
+      } else if (error.name === 'AbortError') {
+        setSubmitMessage('❌ Délai d\'attente dépassé. Veuillez réessayer.');
+      } else {
+        setSubmitMessage('❌ Erreur de connexion au serveur. Détails: ' + error.message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -752,18 +815,17 @@ const SubmitProject = () => {
                 <h3 style={styles.sectionHeading}>Description</h3>
                 
                 {formData.goal && (
-                  <div style={styles.descriptionItem}>
-                    <h4 style={styles.subHeading}>Objectif du projet</h4>
-                    <p style={styles.descriptionText}>{formData.goal}</p>
-                  </div>
-                )}
-                
-                {formData.technology && (
-                  <div style={styles.descriptionItem}>
-                    <h4 style={styles.subHeading}>Technologie utilisée</h4>
-                    <p style={styles.descriptionText}>{formData.technology}</p>
-                  </div>
-                )}
+                <div style={styles.descriptionItem}>
+                 <h4 style={styles.subHeading}>Objectif du projet</h4>
+                  <p style={styles.descriptionText}>{formData.goal}</p>  // ✅ CORRECT!
+              </div>
+               )}
+               {formData.technology && (
+                <div style={styles.descriptionItem}>
+                <h4 style={styles.subHeading}>Technologie utilisée</h4>
+                <p style={styles.descriptionText}>{formData.technology}</p>
+                </div>
+               )}
                 
                 {formData.impact && (
                   <div style={styles.descriptionItem}>
@@ -832,7 +894,7 @@ const SubmitProject = () => {
   );
 };
 
-// Updated styles with catalog design
+// Complete styles object
 const styles = {
   container: {
     minHeight: '100vh',
@@ -1339,6 +1401,4 @@ const styles = {
     borderRadius: '8px'
   }
 };
-
 export default SubmitProject;
-            

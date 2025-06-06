@@ -1,5 +1,7 @@
 package com.regioninvest.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.regioninvest.dto.ProjectDTO;
 import com.regioninvest.dto.ProjectCreateRequest;
 import com.regioninvest.dto.ProjectResponse;
@@ -11,21 +13,26 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/projects")
-@CrossOrigin(origins = "${app.cors.allowed-origins:http://localhost:3000}")
+@CrossOrigin(origins = "*", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class ProjectController {
 
     @Autowired
     private ProjectService projectService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     /**
      * GET /api/projects - Récupérer tous les projets avec filtrage et pagination
@@ -80,9 +87,9 @@ public class ProjectController {
     }
 
     /**
-     * POST /api/projects - Créer un nouveau projet (ADMIN et PORTEUR seulement)
+     * POST /api/projects - Créer un nouveau projet sans fichiers (ADMIN et PORTEUR seulement)
      */
-    @PostMapping
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasRole('ADMIN') or hasRole('PORTEUR')")
     public ResponseEntity<ApiResponse<ProjectDTO>> createProject(
             @Valid @RequestBody ProjectCreateRequest request,
@@ -90,6 +97,8 @@ public class ProjectController {
 
         try {
             String username = authentication.getName();
+            System.out.println("📝 Creating project without files for user: " + username);
+
             ProjectDTO createdProject = projectService.createProject(request, null, username);
 
             System.out.println("✅ Project created: " + createdProject.getTitle() + " by " + username);
@@ -98,9 +107,11 @@ public class ProjectController {
                     .body(ApiResponse.success(createdProject, "Projet créé avec succès"));
 
         } catch (IllegalArgumentException e) {
+            System.err.println("❌ Validation error: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.error("Données invalides: " + e.getMessage()));
         } catch (Exception e) {
+            System.err.println("❌ Unexpected error: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("Erreur lors de la création du projet: " + e.getMessage()));
@@ -108,47 +119,178 @@ public class ProjectController {
     }
 
     /**
-     * POST /api/projects/upload - Upload project with image (ADMIN et PORTEUR seulement)
+     * POST /api/projects/upload - Upload project with files (ADMIN et PORTEUR seulement)
+     * FIXED: Proper handling of multipart data with JSON string parsing
      */
-    @PostMapping("/upload")
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN') or hasRole('PORTEUR')")
     public ResponseEntity<ApiResponse<ProjectDTO>> createProjectWithImage(
-            @Valid @RequestPart("project") ProjectCreateRequest request,
-            @RequestPart(value = "image", required = false) MultipartFile image,
+            @RequestParam("project") String projectJson,
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "pdfFile", required = false) MultipartFile pdfFile,
             Authentication authentication) {
 
         try {
             String username = authentication.getName();
+            System.out.println("🔥 Creating project with files for user: " + username);
+            System.out.println("📝 Received project JSON: " + projectJson);
+
+            // Parse JSON string to ProjectCreateRequest object
+            ProjectCreateRequest request;
+            try {
+                request = objectMapper.readValue(projectJson, ProjectCreateRequest.class);
+                System.out.println("✅ Successfully parsed project data: " + request.getTitle());
+            } catch (JsonProcessingException e) {
+                System.err.println("❌ JSON parsing error: " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error("Format JSON invalide: " + e.getMessage()));
+            }
+
+            // Validate required fields
+            if (request.getTitle() == null || request.getTitle().trim().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error("Le titre du projet est requis"));
+            }
+
+            if (request.getDescription() == null || request.getDescription().trim().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error("La description du projet est requise"));
+            }
+
+            if (request.getSector() == null || request.getSector().trim().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error("Le secteur est requis"));
+            }
+
+            if (request.getBudget() == null || request.getBudget().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error("Le budget doit être supérieur à 0"));
+            }
+
+            // Log file information and validate
+            if (image != null && !image.isEmpty()) {
+                System.out.println("📷 Image file: " + image.getOriginalFilename() + " (" + image.getSize() + " bytes)");
+
+                // Validate image file
+                if (image.getContentType() == null || !image.getContentType().startsWith("image/")) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(ApiResponse.error("Le fichier image doit être de type image"));
+                }
+
+                if (image.getSize() > 5 * 1024 * 1024) { // 5MB
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(ApiResponse.error("La taille de l'image ne doit pas dépasser 5MB"));
+                }
+            }
+
+            if (pdfFile != null && !pdfFile.isEmpty()) {
+                System.out.println("📄 PDF file: " + pdfFile.getOriginalFilename() + " (" + pdfFile.getSize() + " bytes)");
+
+                // Validate PDF file
+                if (!"application/pdf".equals(pdfFile.getContentType())) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(ApiResponse.error("Le fichier doit être un PDF"));
+                }
+
+                if (pdfFile.getSize() > 10 * 1024 * 1024) { // 10MB
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(ApiResponse.error("La taille du PDF ne doit pas dépasser 10MB"));
+                }
+            }
+
+            // Create project with files
             ProjectDTO createdProject = projectService.createProject(request, image, username);
 
-            System.out.println("✅ Project with image created: " + createdProject.getTitle() + " by " + username);
+            System.out.println("✅ Project with files created: " + createdProject.getTitle() + " by " + username);
 
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(ApiResponse.success(createdProject, "Projet créé avec succès"));
 
         } catch (IllegalArgumentException e) {
+            System.err.println("❌ Validation error: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.error("Données invalides: " + e.getMessage()));
         } catch (Exception e) {
+            System.err.println("❌ Unexpected error: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("Erreur lors de la création du projet: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * 🧪 TEST ENDPOINT - Remove in production
+     */
+    @PostMapping("/test-upload")
+    @CrossOrigin(origins = "*")
+    public ResponseEntity<Map<String, Object>> testUpload(
+            @RequestParam(value = "project", required = false) String projectJson,
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "pdfFile", required = false) MultipartFile pdfFile,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            System.out.println("🧪 TEST UPLOAD ENDPOINT CALLED");
+            System.out.println("📝 Project JSON: " + projectJson);
+            System.out.println("🔑 Auth Header: " + (authHeader != null ? "Present" : "Missing"));
+
+            if (image != null) {
+                System.out.println("📸 Image: " + image.getOriginalFilename() + " (" + image.getSize() + " bytes)");
+            }
+            if (pdfFile != null) {
+                System.out.println("📄 PDF: " + pdfFile.getOriginalFilename() + " (" + pdfFile.getSize() + " bytes)");
+            }
+
+            // Try to parse project JSON
+            if (projectJson != null) {
+                try {
+                    ProjectCreateRequest project = objectMapper.readValue(projectJson, ProjectCreateRequest.class);
+                    System.out.println("✅ Successfully parsed project: " + project.getTitle());
+                    response.put("projectParsed", true);
+                    response.put("projectTitle", project.getTitle());
+                } catch (Exception e) {
+                    System.err.println("❌ Failed to parse project JSON: " + e.getMessage());
+                    response.put("projectParsed", false);
+                    response.put("parseError", e.getMessage());
+                }
+            }
+
+            response.put("success", true);
+            response.put("message", "Test upload successful");
+            response.put("hasImage", image != null);
+            response.put("hasPdf", pdfFile != null);
+            response.put("hasAuth", authHeader != null);
+            response.put("timestamp", System.currentTimeMillis());
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(500).body(response);
         }
     }
 
     /**
      * PUT /api/projects/{id} - Modifier un projet (ADMIN ou propriétaire PORTEUR)
      */
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN') or hasRole('PORTEUR')")
     public ResponseEntity<ApiResponse<ProjectDTO>> updateProject(
             @PathVariable Long id,
-            @Valid @RequestPart("project") ProjectCreateRequest request,
-            @RequestPart(value = "image", required = false) MultipartFile image,
+            @RequestParam("project") String projectJson,
+            @RequestParam(value = "image", required = false) MultipartFile image,
             Authentication authentication) {
 
         try {
             String username = authentication.getName();
+
+            // Parse JSON string to ProjectCreateRequest object
+            ProjectCreateRequest request = objectMapper.readValue(projectJson, ProjectCreateRequest.class);
+
             ProjectDTO updatedProject = projectService.updateProject(id, request, image, username);
 
             System.out.println("✅ Project updated: " + updatedProject.getTitle() + " by " + username);
@@ -175,7 +317,7 @@ public class ProjectController {
 
         try {
             String username = authentication.getName();
-            String projectTitle = projectService.getProjectById(id).getTitle(); // Get title before deletion
+            String projectTitle = projectService.getProjectById(id).getTitle();
 
             projectService.deleteProject(id, username);
 

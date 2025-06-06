@@ -65,16 +65,33 @@ public class SecurityConfig {
     }
 
     /**
-     * ← ADD THIS: CORS Configuration
+     * ENHANCED CORS Configuration for file uploads and multipart data
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("*"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+
+        // Allow all origins - you can restrict this in production
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+
+        // Allow all HTTP methods including OPTIONS for preflight
+        configuration.setAllowedMethods(Arrays.asList(
+                "GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"
+        ));
+
+        // Allow all headers including those needed for file uploads
         configuration.setAllowedHeaders(Arrays.asList("*"));
+
+        // Allow credentials (important for authentication)
         configuration.setAllowCredentials(true);
-        configuration.setExposedHeaders(Arrays.asList("Authorization"));
+
+        // Expose headers that might be needed by frontend
+        configuration.setExposedHeaders(Arrays.asList(
+                "Authorization", "Content-Type", "Content-Length", "X-Requested-With"
+        ));
+
+        // Set max age for preflight requests (24 hours)
+        configuration.setMaxAge(86400L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
@@ -84,7 +101,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // ← ADD THIS
+                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // ← ENHANCED CORS
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -102,10 +119,14 @@ public class SecurityConfig {
                         .requestMatchers("/api/projects/{id}", "/api/projects/{id}/similar", "/api/projects/{id}/view").permitAll()
                         .requestMatchers("/api/articles/**").permitAll()
 
+                        // 🧪 Test endpoints (remove in production)
+                        .requestMatchers("/api/projects/test-upload").permitAll()
+
                         // 👑 Admin endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-                        // 🏗️ Porteur endpoints
+                        // 🏗️ Porteur endpoints - IMPORTANT: Both create endpoints
+                        .requestMatchers("/api/projects/upload").hasAnyRole("ADMIN", "PORTEUR")
                         .requestMatchers("/api/porteur/**").hasAnyRole("ADMIN", "PORTEUR")
 
                         // 💼 Investment endpoints
