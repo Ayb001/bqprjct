@@ -4,6 +4,7 @@ import com.regioninvest.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -115,8 +116,8 @@ public class SecurityConfig {
                         .requestMatchers("/uploads/**").permitAll() // ← ADD THIS
 
                         // 📊 Public project endpoints (read-only) ← ADD THESE
-                        .requestMatchers("/api/projects", "/api/projects/search", "/api/projects/stats").permitAll()
-                        .requestMatchers("/api/projects/{id}", "/api/projects/{id}/similar", "/api/projects/{id}/view").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/projects", "/api/projects/search", "/api/projects/stats").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/projects/{id}", "/api/projects/{id}/similar", "/api/projects/{id}/view").permitAll()
                         .requestMatchers("/api/articles/**").permitAll()
 
                         // 🧪 Test endpoints (remove in production)
@@ -125,8 +126,12 @@ public class SecurityConfig {
                         // 👑 Admin endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-                        // 🏗️ Porteur endpoints - IMPORTANT: Both create endpoints
-                        .requestMatchers("/api/projects/upload").hasAnyRole("ADMIN", "PORTEUR")
+                        // 🏗️ Porteur endpoints - FIXED: Both create endpoints
+                        .requestMatchers(HttpMethod.POST, "/api/projects").hasAnyRole("ADMIN", "PORTEUR")
+                        .requestMatchers(HttpMethod.POST, "/api/projects/upload").hasAnyRole("ADMIN", "PORTEUR")
+                        .requestMatchers(HttpMethod.PUT, "/api/projects/**").hasAnyRole("ADMIN", "PORTEUR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/projects/**").hasAnyRole("ADMIN", "PORTEUR")
+                        .requestMatchers("/api/projects/my").hasAnyRole("ADMIN", "PORTEUR")
                         .requestMatchers("/api/porteur/**").hasAnyRole("ADMIN", "PORTEUR")
 
                         // 💼 Investment endpoints
