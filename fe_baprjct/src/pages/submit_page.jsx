@@ -162,7 +162,7 @@ const SubmitProject = () => {
 
     setIsSubmitting(true);
     setSubmitMessage('');
-
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     try {
       // Get JWT token from localStorage
       const token = localStorage.getItem('token') || localStorage.getItem('jwt');

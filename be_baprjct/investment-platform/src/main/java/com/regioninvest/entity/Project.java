@@ -52,7 +52,7 @@ public class Project {
     @Min(value = 0, message = "Le nombre d'emplois ne peut pas être négatif")
     private Integer jobs = 0;
 
-    @Column(precision = 5, scale = 2)
+    @Column(precision = 8, scale = 2)
     @DecimalMin(value = "0.0", message = "Le ratio de rentabilité ne peut pas être négatif")
     private BigDecimal profitability = BigDecimal.ZERO;
 

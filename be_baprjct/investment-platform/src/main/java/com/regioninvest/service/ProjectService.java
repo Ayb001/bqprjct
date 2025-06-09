@@ -125,13 +125,13 @@ public class ProjectService {
      * Créer un nouveau projet
      */
     public ProjectDTO createProject(ProjectCreateRequest request, MultipartFile image, String username) {
-        // Vérifier que l'utilisateur existe et est un porteur
+        // Vérifier que l'utilisateur existe et est un porteur ou admin
         User porteur = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé: " + username));
 
-        // Vérifier le rôle (adapté à votre structure ManyToOne)
-        if (!hasRole(porteur, "PORTEUR")) {
-            throw new RuntimeException("Seuls les porteurs peuvent créer des projets");
+        // Vérifier le rôle - permettre ADMIN et PORTEUR
+        if (!hasRole(porteur, "PORTEUR") && !hasRole(porteur, "ADMIN")) {
+            throw new RuntimeException("Seuls les porteurs et administrateurs peuvent créer des projets");
         }
 
         // Trouver ou créer le secteur
@@ -162,8 +162,11 @@ public class ProjectService {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Projet non trouvé"));
 
-        // Vérifier que l'utilisateur est le propriétaire
-        if (!project.getPorteur().getUsername().equals(username)) {
+        // Vérifier que l'utilisateur est le propriétaire OU admin
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        if (!project.getPorteur().getUsername().equals(username) && !hasRole(currentUser, "ADMIN")) {
             throw new RuntimeException("Vous n'êtes pas autorisé à modifier ce projet");
         }
 
@@ -191,10 +194,12 @@ public class ProjectService {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Projet non trouvé"));
 
-        // FIXED: Handle null username for testing/public access
+        // Vérifier les permissions - propriétaire OU admin
         if (username != null) {
-            // Only check authorization if user is authenticated
-            if (!project.getPorteur().getUsername().equals(username)) {
+            User currentUser = userRepository.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+            if (!project.getPorteur().getUsername().equals(username) && !hasRole(currentUser, "ADMIN")) {
                 throw new RuntimeException("Vous n'êtes pas autorisé à supprimer ce projet");
             }
             System.out.println("Project " + id + " deleted by authenticated user: " + username);
