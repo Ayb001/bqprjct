@@ -214,11 +214,17 @@ const ProjectCatalogPorteur = () => {
   };
 
   // Handle modify button click
-  const handleModifyClick = (project) => {
-    // For now, we'll just alert - you can implement the modify functionality later
-    alert(`🔧 Modification du projet: ${project.title}\n\n(Fonctionnalité à implémenter)`);
-  };
-
+const handleModifyClick = (project) => {
+  // Navigate to submit page with project ID for editing
+  const projectId = project.rawProject?.id || project.id;
+  
+  if (projectId) {
+    // Redirect to submit page with edit mode
+    window.location.href = `/submit_page?id=${projectId}`;
+  } else {
+    alert('❌ Impossible de modifier ce projet: ID manquant');
+  }
+};
   // Initial load
   useEffect(() => {
     fetchProjects(0);

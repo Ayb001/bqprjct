@@ -7,6 +7,11 @@ import com.regioninvest.dto.ProjectCreateRequest;
 import com.regioninvest.dto.ProjectResponse;
 import com.regioninvest.dto.ApiResponse;
 import com.regioninvest.service.ProjectService;
+
+import com.regioninvest.service.UserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
@@ -39,6 +44,10 @@ public class ProjectController {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private UserService userService;
+
+    private static final Logger logger = LoggerFactory.getLogger(ProjectController.class);
     /**
      * GET /api/projects - Récupérer tous les projets avec filtrage et pagination
      */
