@@ -122,9 +122,9 @@ public class ProjectService {
     }
 
     /**
-     * Créer un nouveau projet
+     * 🆕 UPDATED: Créer un nouveau projet avec support PDF
      */
-    public ProjectDTO createProject(ProjectCreateRequest request, MultipartFile image, String username) {
+    public ProjectDTO createProject(ProjectCreateRequest request, MultipartFile image, MultipartFile pdfFile, String username) {
         // Vérifier que l'utilisateur existe et est un porteur ou admin
         User porteur = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé: " + username));
@@ -149,6 +149,12 @@ public class ProjectService {
             project.setImageUrl(imageUrl);
         }
 
+        // 🆕 NEW: Gérer l'upload de PDF
+        if (pdfFile != null && !pdfFile.isEmpty()) {
+            String pdfUrl = saveProjectPDF(pdfFile, project.getTitle());
+            project.setPdfUrl(pdfUrl);
+        }
+
         // Sauvegarder
         Project savedProject = projectRepository.save(project);
 
@@ -156,9 +162,9 @@ public class ProjectService {
     }
 
     /**
-     * Mettre à jour un projet
+     * 🆕 UPDATED: Mettre à jour un projet avec support PDF
      */
-    public ProjectDTO updateProject(Long id, ProjectCreateRequest request, MultipartFile image, String username) {
+    public ProjectDTO updateProject(Long id, ProjectCreateRequest request, MultipartFile image, MultipartFile pdfFile, String username) {
         Project project = projectRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Projet non trouvé"));
 
@@ -181,6 +187,12 @@ public class ProjectService {
         if (image != null && !image.isEmpty()) {
             String imageUrl = saveProjectImage(image, project.getTitle());
             project.setImageUrl(imageUrl);
+        }
+
+        // 🆕 NEW: Gérer l'upload de PDF
+        if (pdfFile != null && !pdfFile.isEmpty()) {
+            String pdfUrl = saveProjectPDF(pdfFile, project.getTitle());
+            project.setPdfUrl(pdfUrl);
         }
 
         Project updatedProject = projectRepository.save(project);
@@ -211,6 +223,11 @@ public class ProjectService {
         // Supprimer l'image si elle existe
         if (project.getImageUrl() != null) {
             deleteProjectImage(project.getImageUrl());
+        }
+
+        // 🆕 NEW: Supprimer le PDF si il existe
+        if (project.getPdfUrl() != null) {
+            deleteProjectPDF(project.getPdfUrl());
         }
 
         projectRepository.delete(project);
@@ -373,7 +390,7 @@ public class ProjectService {
     // ============= MÉTHODES PRIVÉES =============
 
     /**
-     * Convertir Project en ProjectDTO pour le catalogue
+     * 🆕 UPDATED: Convertir Project en ProjectDTO pour le catalogue avec PDF URL
      */
     private ProjectDTO convertToDTO(Project project) {
         ProjectDTO dto = new ProjectDTO();
@@ -390,6 +407,7 @@ public class ProjectService {
         dto.setJobs(project.getJobs());
         dto.setProfitability(project.getProfitability());
         dto.setImageUrl(formatImageUrl(project.getImageUrl()));
+        dto.setPdfUrl(project.getPdfUrl()); // 🆕 NEW: Include PDF URL
         dto.setStatus(project.getStatus().name());
         dto.setCategory(project.getCategory() != null ? project.getCategory().name() : null);
         dto.setViews(project.getViews());
@@ -413,7 +431,7 @@ public class ProjectService {
     }
 
     /**
-     * Convertir Project en ProjectDTO avec tous les détails
+     * 🆕 UPDATED: Convertir Project en ProjectDTO avec tous les détails y compris PDF
      */
     private ProjectDTO convertToDetailDTO(Project project) {
         ProjectDTO dto = convertToDTO(project);
@@ -546,6 +564,33 @@ public class ProjectService {
     }
 
     /**
+     * 🆕 NEW: Sauvegarder un fichier PDF de projet
+     */
+    private String saveProjectPDF(MultipartFile file, String projectTitle) {
+        try {
+            // Créer le répertoire s'il n'existe pas
+            Path uploadPath = Paths.get(uploadDir);
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            // Générer un nom de fichier unique pour le PDF
+            String filename = "project_pdf_" + System.currentTimeMillis() + "_" +
+                    cleanFilename(projectTitle) + ".pdf";
+
+            Path filePath = uploadPath.resolve(filename);
+
+            // Copier le fichier
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            return filename;
+
+        } catch (IOException e) {
+            throw new RuntimeException("Erreur lors de la sauvegarde du PDF: " + e.getMessage());
+        }
+    }
+
+    /**
      * Supprimer une image de projet
      */
     private void deleteProjectImage(String imageUrl) {
@@ -555,6 +600,19 @@ public class ProjectService {
         } catch (IOException e) {
             // Log l'erreur mais ne pas échouer
             System.err.println("Erreur lors de la suppression de l'image: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 🆕 NEW: Supprimer un fichier PDF de projet
+     */
+    private void deleteProjectPDF(String pdfUrl) {
+        try {
+            Path filePath = Paths.get(uploadDir, pdfUrl);
+            Files.deleteIfExists(filePath);
+        } catch (IOException e) {
+            // Log l'erreur mais ne pas échouer
+            System.err.println("Erreur lors de la suppression du PDF: " + e.getMessage());
         }
     }
 
@@ -596,7 +654,6 @@ public class ProjectService {
         return description.substring(0, maxLength) + "...";
     }
 
-
     /**
      * Formater l'URL de l'image
      */
@@ -609,7 +666,7 @@ public class ProjectService {
             return imageUrl;
         }
 
-        return baseUrl + "/uploads/projects/" + imageUrl;
+        return baseUrl + "/uploads/" + imageUrl;
     }
 
     /**

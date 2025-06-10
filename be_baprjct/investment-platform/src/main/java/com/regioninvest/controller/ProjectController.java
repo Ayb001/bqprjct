@@ -9,9 +9,12 @@ import com.regioninvest.dto.ApiResponse;
 import com.regioninvest.service.ProjectService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +23,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -87,6 +92,37 @@ public class ProjectController {
     }
 
     /**
+     * 🆕 NEW: GET /api/projects/{id}/pdf - Download project PDF file
+     */
+    @GetMapping("/{id}/pdf")
+    public ResponseEntity<Resource> downloadProjectPDF(@PathVariable Long id) {
+        try {
+            ProjectDTO project = projectService.getProjectById(id);
+
+            if (project.getPdfUrl() == null || project.getPdfUrl().isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // Get the file from uploads directory
+            Path filePath = Paths.get("uploads", project.getPdfUrl());
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if (resource.exists() && resource.isReadable()) {
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.CONTENT_DISPOSITION,
+                                "attachment; filename=\"" + project.getTitle() + "_fiche.pdf\"")
+                        .header(HttpHeaders.CONTENT_TYPE, "application/pdf")
+                        .body(resource);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
      * POST /api/projects - Créer un nouveau projet sans fichiers (ADMIN et PORTEUR seulement)
      */
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -99,7 +135,7 @@ public class ProjectController {
             String username = authentication.getName();
             System.out.println("📝 Creating project without files for user: " + username);
 
-            ProjectDTO createdProject = projectService.createProject(request, null, username);
+            ProjectDTO createdProject = projectService.createProject(request, null, null, username);
 
             System.out.println("✅ Project created: " + createdProject.getTitle() + " by " + username);
 
@@ -120,7 +156,7 @@ public class ProjectController {
 
     /**
      * POST /api/projects/upload - Upload project with files (ADMIN et PORTEUR seulement)
-     * FIXED: Proper handling of multipart data with JSON string parsing
+     * 🆕 UPDATED: Now handles both image and PDF files
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN') or hasRole('PORTEUR')")
@@ -183,6 +219,7 @@ public class ProjectController {
                 }
             }
 
+            // 🆕 NEW: PDF file validation
             if (pdfFile != null && !pdfFile.isEmpty()) {
                 System.out.println("📄 PDF file: " + pdfFile.getOriginalFilename() + " (" + pdfFile.getSize() + " bytes)");
 
@@ -198,8 +235,8 @@ public class ProjectController {
                 }
             }
 
-            // Create project with files
-            ProjectDTO createdProject = projectService.createProject(request, image, username);
+            // 🆕 UPDATED: Create project with both image and PDF files
+            ProjectDTO createdProject = projectService.createProject(request, image, pdfFile, username);
 
             System.out.println("✅ Project with files created: " + createdProject.getTitle() + " by " + username);
 
@@ -276,6 +313,7 @@ public class ProjectController {
 
     /**
      * PUT /api/projects/{id} - Modifier un projet (ADMIN ou propriétaire PORTEUR)
+     * 🆕 UPDATED: Now handles PDF files too
      */
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN') or hasRole('PORTEUR')")
@@ -283,6 +321,7 @@ public class ProjectController {
             @PathVariable Long id,
             @RequestParam("project") String projectJson,
             @RequestParam(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "pdfFile", required = false) MultipartFile pdfFile,
             Authentication authentication) {
 
         try {
@@ -291,7 +330,7 @@ public class ProjectController {
             // Parse JSON string to ProjectCreateRequest object
             ProjectCreateRequest request = objectMapper.readValue(projectJson, ProjectCreateRequest.class);
 
-            ProjectDTO updatedProject = projectService.updateProject(id, request, image, username);
+            ProjectDTO updatedProject = projectService.updateProject(id, request, image, pdfFile, username);
 
             System.out.println("✅ Project updated: " + updatedProject.getTitle() + " by " + username);
 

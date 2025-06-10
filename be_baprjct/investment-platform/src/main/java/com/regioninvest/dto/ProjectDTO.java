@@ -52,6 +52,7 @@ public class ProjectDTO {
     private String incentives;
     private String partners;
     private String imageUrl;
+    private String pdfUrl; // 🆕 ADD PDF SUPPORT
     private String publishTime;
     private String status;
     private String category;
@@ -228,6 +229,15 @@ public class ProjectDTO {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    // 🆕 PDF URL getter/setter
+    public String getPdfUrl() {
+        return pdfUrl;
+    }
+
+    public void setPdfUrl(String pdfUrl) {
+        this.pdfUrl = pdfUrl;
     }
 
     public String getPublishTime() {

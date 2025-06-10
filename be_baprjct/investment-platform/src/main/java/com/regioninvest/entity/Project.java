@@ -74,6 +74,9 @@ public class Project {
     @Column(name = "image_url")
     private String imageUrl;
 
+    @Column(name = "pdf_url") // 🆕 NEW: PDF URL field
+    private String pdfUrl;
+
     @Column(name = "publish_time")
     private String publishTime;
 
@@ -263,6 +266,15 @@ public class Project {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    // 🆕 NEW: PDF URL getter/setter
+    public String getPdfUrl() {
+        return pdfUrl;
+    }
+
+    public void setPdfUrl(String pdfUrl) {
+        this.pdfUrl = pdfUrl;
     }
 
     public String getPublishTime() {

@@ -22,7 +22,7 @@ public class TestProjectController {
             @Valid @RequestBody ProjectCreateRequest request) {
         try {
             System.out.println("🧪 TEST: Received request: " + request.getTitle());
-            ProjectDTO createdProject = projectService.createProject(request, null, "porteur1");
+            ProjectDTO createdProject = projectService.createProject(request, null, null, "porteur1");
             System.out.println("🧪 TEST: Project created successfully with ID: " + createdProject.getId());
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(ApiResponse.success(createdProject, "Test project created successfully"));

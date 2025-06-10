@@ -6,13 +6,13 @@ const ProjectCatalogPorteur = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProvince, setSelectedProvince] = useState('');
   const [selectedSector, setSelectedSector] = useState('');
   const [selectedBudget, setSelectedBudget] = useState('');
-  
+
   // UI states
   const [viewMode, setViewMode] = useState('grid');
   const [currentPage, setCurrentPage] = useState(1);
@@ -20,11 +20,11 @@ const ProjectCatalogPorteur = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [deletingProject, setDeletingProject] = useState(false);
-  
+
   // Backend pagination data
   const [totalPages, setTotalPages] = useState(0);
   const [totalProjects, setTotalProjects] = useState(0);
-  
+
   // Filter options from backend
   const [filterOptions, setFilterOptions] = useState({
     provinces: ["Toutes les provinces"],
@@ -39,16 +39,51 @@ const ProjectCatalogPorteur = () => {
     localStorage.removeItem('jwt');
     localStorage.removeItem('user');
     localStorage.removeItem('userRole');
-    
+
     // Redirect to home or login page
     window.location.href = '/';
   };
 
+  // 🆕 PDF Download Handler
+  const handleDownloadPDF = async (project) => {
+    try {
+      // Check if project has PDF
+      if (!project.rawProject?.id) {
+        alert('❌ Aucun fichier PDF disponible pour ce projet');
+        return;
+      }
+
+      // Get token
+      const token = localStorage.getItem('token') || localStorage.getItem('jwt');
+
+      // Download PDF directly from backend
+      const response = await fetch(`http://localhost:8080/api/projects/${project.rawProject.id}/pdf`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${project.title}_fiche.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        alert('❌ Impossible de télécharger le fichier PDF');
+      }
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('❌ Erreur lors du téléchargement');
+    }
+  };
   // Fetch projects from backend
   const fetchProjects = async (page = 0) => {
     try {
       setLoading(true);
-      
+
       // Build query parameters
       const params = new URLSearchParams({
         page: page.toString(),
@@ -72,16 +107,16 @@ const ProjectCatalogPorteur = () => {
       }
 
       const response = await fetch(`http://localhost:8080/api/projects?${params}`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const apiResponse = await response.json();
-      
+
       if (apiResponse.success && apiResponse.data) {
         const { projects: projectsList, pagination, filters } = apiResponse.data;
-        
+
         // Transform backend data to match project structure
         const transformedProjects = (projectsList || []).map(project => ({
           id: project.id,
@@ -98,16 +133,16 @@ const ProjectCatalogPorteur = () => {
           // Keep backend data for potential future use
           rawProject: project
         }));
-        
+
         setProjects(transformedProjects);
-        
+
         // Update pagination info
         if (pagination) {
           setCurrentPage(pagination.currentPage + 1);
           setTotalPages(pagination.totalPages);
           setTotalProjects(pagination.totalProjects);
         }
-        
+
         // Update filter options
         if (filters) {
           setFilterOptions({
@@ -119,7 +154,7 @@ const ProjectCatalogPorteur = () => {
       } else {
         throw new Error(apiResponse.error || 'Failed to fetch projects');
       }
-      
+
     } catch (error) {
       console.error('Error fetching projects:', error);
       setError(error.message);
@@ -133,19 +168,19 @@ const ProjectCatalogPorteur = () => {
   const deleteProject = async (projectId) => {
     try {
       setDeletingProject(true);
-      
+
       // Get JWT token from localStorage (adjust based on your auth implementation)
       const token = localStorage.getItem('token') || localStorage.getItem('jwt');
-      
+
       const headers = {
         'Content-Type': 'application/json',
       };
-      
+
       // Add Authorization header if token exists
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      
+
       const response = await fetch(`http://localhost:8080/api/projects/${projectId}`, {
         method: 'DELETE',
         headers: headers
@@ -156,14 +191,14 @@ const ProjectCatalogPorteur = () => {
         await fetchProjects(currentPage - 1);
         setShowDeleteModal(false);
         setSelectedProject(null);
-        
+
         // Show success message
         alert('✅ Projet supprimé avec succès!');
       } else {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
-      
+
     } catch (error) {
       console.error('Error deleting project:', error);
       alert(`❌ Erreur lors de la suppression: ${error.message}`);
@@ -197,6 +232,9 @@ const ProjectCatalogPorteur = () => {
     }
   }, [searchTerm, selectedProvince, selectedSector, selectedBudget]);
 
+  useEffect(() => {
+  console.log('🖼️ Image URLs:', projects.map(p => ({ title: p.title, image: p.image })));
+}, [projects]);
   // Handle page changes
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -250,7 +288,7 @@ const ProjectCatalogPorteur = () => {
   return (
     <div className="catalog-container">
       <style>{catalogStyles}</style>
-      
+
       {/* Header */}
       <header className="catalog-header">
         <div className="header-content">
@@ -288,7 +326,7 @@ const ProjectCatalogPorteur = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          
+
           <div className="filters-row">
             <select
               value={selectedProvince}
@@ -357,17 +395,17 @@ const ProjectCatalogPorteur = () => {
                 <img src={project.image} alt={project.title} />
                 <div className="sector-badge">{project.sector}</div>
               </div>
-              
+
               <div className="project-content">
                 <h3 className="project-title">{project.title}</h3>
-                
+
                 <div className="project-location">
                   <MapPin size={16} />
                   <span>{project.location}</span>
                 </div>
-                
+
                 <p className="project-description">{project.description}</p>
-                
+
                 <div className="project-stats">
                   <div className="stat">
                     <DollarSign size={16} />
@@ -382,24 +420,27 @@ const ProjectCatalogPorteur = () => {
                     <span>{project.views} vues</span>
                   </div>
                 </div>
-                
+
                 <div className="project-actions">
                   <button className="btn btn-primary">
                     <Eye size={16} />
                     Détails
                   </button>
-                  <button className="btn btn-secondary">
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => handleDownloadPDF(project)}
+                  >
                     <Download size={16} />
                     Fiche
                   </button>
-                  <button 
+                  <button
                     className="btn btn-warning"
                     onClick={() => handleModifyClick(project)}
                   >
                     <Edit size={16} />
                     Modifier
                   </button>
-                  <button 
+                  <button
                     className="btn btn-danger"
                     onClick={() => handleDeleteClick(project)}
                   >
@@ -423,7 +464,7 @@ const ProjectCatalogPorteur = () => {
           >
             Précédent
           </button>
-          
+
           {[...Array(totalPages)].map((_, index) => (
             <button
               key={index + 1}
@@ -433,7 +474,7 @@ const ProjectCatalogPorteur = () => {
               {index + 1}
             </button>
           ))}
-          
+
           <button
             className="pagination-btn"
             onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
@@ -450,35 +491,35 @@ const ProjectCatalogPorteur = () => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Confirmer la suppression</h3>
-              <button 
+              <button
                 className="modal-close"
                 onClick={() => setShowDeleteModal(false)}
               >
                 ×
               </button>
             </div>
-            
+
             <div className="modal-body">
               <div className="delete-warning">
                 <div className="warning-icon">⚠️</div>
                 <h4>Êtes-vous sûr de vouloir supprimer ce projet ?</h4>
                 <p><strong>{selectedProject?.title}</strong></p>
                 <p className="warning-text">
-                  Cette action est irréversible. Le projet sera définitivement supprimé 
+                  Cette action est irréversible. Le projet sera définitivement supprimé
                   de la base de données.
                 </p>
               </div>
-              
+
               <div className="form-actions">
-                <button 
-                  className="btn btn-secondary" 
+                <button
+                  className="btn btn-secondary"
                   onClick={() => setShowDeleteModal(false)}
                   disabled={deletingProject}
                 >
                   Annuler
                 </button>
-                <button 
-                  className="btn btn-danger" 
+                <button
+                  className="btn btn-danger"
                   onClick={() => deleteProject(selectedProject.id)}
                   disabled={deletingProject}
                 >
@@ -496,44 +537,44 @@ const ProjectCatalogPorteur = () => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Demande d'Investissement</h3>
-              <button 
+              <button
                 className="modal-close"
                 onClick={() => setShowInvestmentModal(false)}
               >
                 ×
               </button>
             </div>
-            
+
             <div className="modal-body">
               <h4>{selectedProject?.title}</h4>
               <p>Soumettez votre demande d'investissement pour ce projet.</p>
-              
+
               <div className="investment-form">
                 <div className="form-group">
                   <label>Nom complet *</label>
                   <input type="text" required />
                 </div>
-                
+
                 <div className="form-group">
                   <label>Email *</label>
                   <input type="email" required />
                 </div>
-                
+
                 <div className="form-group">
                   <label>Téléphone *</label>
                   <input type="tel" required />
                 </div>
-                
+
                 <div className="form-group">
                   <label>Montant d'investissement souhaité</label>
                   <input type="text" placeholder="Ex: 500,000 Dhs" />
                 </div>
-                
+
                 <div className="form-group">
                   <label>Message</label>
                   <textarea rows="4" placeholder="Décrivez votre intérêt pour ce projet..."></textarea>
                 </div>
-                
+
                 <div className="form-actions">
                   <button className="btn btn-secondary" onClick={() => setShowInvestmentModal(false)}>
                     Annuler

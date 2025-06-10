@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, FileText, ImageIcon } from 'lucide-react';
 
 const SubmitProject = () => {
+  // Get project ID from URL params (for edit mode)
+  const urlParams = new URLSearchParams(window.location.search);
+  const projectId = urlParams.get('id');
+  const isEditMode = !!projectId;
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -19,7 +24,10 @@ const SubmitProject = () => {
     partners: '',
     image: null,
     pdfFile: null,
-    publishTime: ''
+    publishTime: '',
+    // Keep track of existing files
+    existingImageUrl: '',
+    existingPdfUrl: ''
   });
 
   const [errors, setErrors] = useState({});
@@ -28,6 +36,7 @@ const SubmitProject = () => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
+  const [isLoadingProject, setIsLoadingProject] = useState(isEditMode);
 
   const sectors = [
     'Agriculture',
@@ -41,7 +50,6 @@ const SubmitProject = () => {
     'Industrie'
   ];
 
-  // Moroccan provinces in Drâa-Tafilalet region
   const provinces = [
     'Errachidia',
     'Ouarzazate',
@@ -50,15 +58,76 @@ const SubmitProject = () => {
     'Zagora'
   ];
 
+  // 🆕 Load existing project data for edit mode
+  useEffect(() => {
+    if (isEditMode && projectId) {
+      loadProjectData(projectId);
+    }
+  }, [isEditMode, projectId]);
+
+  const loadProjectData = async (id) => {
+    try {
+      setIsLoadingProject(true);
+      const token = localStorage.getItem('token') || localStorage.getItem('jwt');
+
+      const response = await fetch(`http://localhost:8080/api/projects/${id}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+
+      if (response.ok) {
+        const apiResponse = await response.json();
+        const project = apiResponse.success ? apiResponse.data : apiResponse;
+
+        // Fill form with existing data
+        setFormData(prev => ({
+          ...prev,
+          title: project.title || '',
+          description: project.description || '',
+          sector: project.sector || '',
+          budget: project.budget?.toString() || '',
+          revenue: project.revenue?.toString() || '',
+          location: project.location || '',
+          province: project.province || '',
+          jobs: project.jobs?.toString() || '',
+          profitability: project.profitability?.toString() || '',
+          goal: project.goal || '',
+          technology: project.technology || '',
+          impact: project.impact || '',
+          incentives: project.incentives || '',
+          partners: project.partners || '',
+          publishTime: project.publishTime || '',
+          existingImageUrl: project.imageUrl || '',
+          existingPdfUrl: project.pdfUrl || ''
+        }));
+
+        // Set existing image preview
+        if (project.imageUrl) {
+          setImagePreview(project.imageUrl);
+        }
+
+        // Set existing PDF name
+        if (project.pdfUrl) {
+          const pdfName = project.pdfUrl.split('/').pop();
+          setPdfFileName(pdfName);
+        }
+
+      } else {
+        throw new Error('Projet non trouvé');
+      }
+    } catch (error) {
+      console.error('Error loading project:', error);
+      setSubmitMessage(`❌ Erreur lors du chargement: ${error.message}`);
+    } finally {
+      setIsLoadingProject(false);
+    }
+  };
+
   // Handle logout function
   const handleLogout = () => {
-    // Clear all authentication tokens
     localStorage.removeItem('token');
     localStorage.removeItem('jwt');
     localStorage.removeItem('user');
     localStorage.removeItem('userRole');
-    
-    // Redirect to home or login page
     window.location.href = '/';
   };
 
@@ -80,13 +149,11 @@ const SubmitProject = () => {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith('image/')) {
         alert('Veuillez sélectionner un fichier image valide.');
         return;
       }
       
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         alert('La taille de l\'image ne doit pas dépasser 5MB.');
         return;
@@ -108,13 +175,11 @@ const SubmitProject = () => {
   const handlePdfChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
       if (file.type !== 'application/pdf') {
         alert('Veuillez sélectionner un fichier PDF valide.');
         return;
       }
       
-      // Validate file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
         alert('La taille du PDF ne doit pas dépasser 10MB.');
         return;
@@ -163,8 +228,8 @@ const SubmitProject = () => {
     setIsSubmitting(true);
     setSubmitMessage('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    
     try {
-      // Get JWT token from localStorage
       const token = localStorage.getItem('token') || localStorage.getItem('jwt');
       
       if (!token) {
@@ -173,7 +238,6 @@ const SubmitProject = () => {
         return;
       }
 
-      // Create project data object
       const projectData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
@@ -193,20 +257,19 @@ const SubmitProject = () => {
         category: "TRADITIONAL_CRAFTS"
       };
 
-      console.log('🚀 Submitting project data:', projectData);
+      console.log(`🚀 ${isEditMode ? 'Updating' : 'Creating'} project:`, projectData);
 
       let response;
       
-      // Check if we have files to upload
-      if (formData.image || formData.pdfFile) {
+      // Determine if we need multipart upload
+      const hasNewFiles = formData.image || formData.pdfFile;
+      
+      if (hasNewFiles) {
         console.log('📂 Using multipart upload endpoint...');
         
         const formDataToSend = new FormData();
-        
-        // Add project data as JSON string (not Blob)
         formDataToSend.append('project', JSON.stringify(projectData));
         
-        // Add files
         if (formData.image) {
           formDataToSend.append('image', formData.image);
         }
@@ -214,20 +277,32 @@ const SubmitProject = () => {
           formDataToSend.append('pdfFile', formData.pdfFile);
         }
 
-        response = await fetch('http://localhost:8080/api/projects/upload', {
-          method: 'POST',
+        // Choose endpoint based on mode
+        const url = isEditMode 
+          ? `http://localhost:8080/api/projects/${projectId}/upload`
+          : 'http://localhost:8080/api/projects/upload';
+        
+        const method = isEditMode ? 'PUT' : 'POST';
+
+        response = await fetch(url, {
+          method,
           headers: {
             'Authorization': `Bearer ${token}`
-            // DO NOT set Content-Type - let browser handle multipart boundaries
           },
           body: formDataToSend
         });
         
       } else {
-        console.log('📝 Using JSON endpoint (no files)...');
+        console.log('📝 Using JSON endpoint...');
         
-        response = await fetch('http://localhost:8080/api/projects', {
-          method: 'POST',
+        const url = isEditMode 
+          ? `http://localhost:8080/api/projects/${projectId}`
+          : 'http://localhost:8080/api/projects';
+        
+        const method = isEditMode ? 'PUT' : 'POST';
+
+        response = await fetch(url, {
+          method,
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
@@ -238,7 +313,6 @@ const SubmitProject = () => {
 
       console.log('📡 Response status:', response.status);
 
-      // Handle response
       let result;
       try {
         const responseText = await response.text();
@@ -257,36 +331,40 @@ const SubmitProject = () => {
       }
 
       if (response.ok) {
-        // Success cases
-        if (result.success || result.data || response.status === 201) {
-          setSubmitMessage('✅ Projet créé avec succès!');
-          console.log('✅ Project created successfully:', result);
+        if (result.success || result.data || response.status === 200 || response.status === 201) {
+          const actionText = isEditMode ? 'modifié' : 'créé';
+          setSubmitMessage(`✅ Projet ${actionText} avec succès!`);
+          console.log(`✅ Project ${actionText} successfully:`, result);
           
-          // Reset form after successful submission
-          setTimeout(() => {
-            setFormData({
-              title: '',
-              description: '',
-              sector: '',
-              budget: '',
-              revenue: '',
-              location: '',
-              province: '',
-              jobs: '',
-              profitability: '',
-              goal: '',
-              technology: '',
-              impact: '',
-              incentives: '',
-              partners: '',
-              image: null,
-              pdfFile: null,
-              publishTime: ''
-            });
-            setImagePreview(null);
-            setPdfFileName('');
-            setSubmitMessage('');
-          }, 3000);
+          // For create mode, reset form after success
+          if (!isEditMode) {
+            setTimeout(() => {
+              setFormData({
+                title: '',
+                description: '',
+                sector: '',
+                budget: '',
+                revenue: '',
+                location: '',
+                province: '',
+                jobs: '',
+                profitability: '',
+                goal: '',
+                technology: '',
+                impact: '',
+                incentives: '',
+                partners: '',
+                image: null,
+                pdfFile: null,
+                publishTime: '',
+                existingImageUrl: '',
+                existingPdfUrl: ''
+              });
+              setImagePreview(null);
+              setPdfFileName('');
+              setSubmitMessage('');
+            }, 3000);
+          }
           
         } else {
           console.error('❌ Unexpected success response format:', result);
@@ -294,17 +372,14 @@ const SubmitProject = () => {
         }
 
       } else {
-        // Error cases
         console.error('❌ API Error:', result);
-        let errorMessage = 'Échec de la soumission';
+        let errorMessage = isEditMode ? 'Échec de la modification' : 'Échec de la soumission';
         
-        // Handle different error types
         if (result && result.error) {
           errorMessage = result.error;
         } else if (result && result.message) {
           errorMessage = result.message;
         } else {
-          // Handle specific HTTP status codes
           switch (response.status) {
             case 400:
               errorMessage = 'Données de projet invalides. Vérifiez tous les champs.';
@@ -314,6 +389,9 @@ const SubmitProject = () => {
               break;
             case 403:
               errorMessage = 'Accès refusé. Vous devez être un porteur de projet.';
+              break;
+            case 404:
+              errorMessage = 'Projet non trouvé.';
               break;
             case 413:
               errorMessage = 'Fichier trop volumineux. Réduisez la taille des fichiers.';
@@ -335,7 +413,6 @@ const SubmitProject = () => {
     } catch (error) {
       console.error('❌ Network/Connection error:', error);
       
-      // Handle different types of network errors
       if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
         setSubmitMessage('❌ Erreur de connexion. Vérifiez que le serveur est démarré sur le port 8080.');
       } else if (error.name === 'AbortError') {
@@ -361,25 +438,39 @@ const SubmitProject = () => {
     });
   };
 
-  const getCurrentTime = () => {
-    return new Date().toLocaleTimeString('fr-FR', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  // Show loading screen while loading project data
+  if (isLoadingProject) {
+    return (
+      <div style={styles.container}>
+        <header style={styles.catalogHeader}>
+          <div style={styles.headerContent}>
+            <div style={styles.logoSection}>
+              <div style={styles.logo}>🏛️</div>
+              <h1 style={styles.headerTitle}>Banque de projets</h1>
+            </div>
+          </div>
+        </header>
+        <div style={styles.loadingContainer}>
+          <div style={styles.loadingSpinner}></div>
+          <p>Chargement des données du projet...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
-      {/* Updated Navigation with same design as catalog */}
       <header style={styles.catalogHeader}>
         <div style={styles.headerContent}>
           <div style={styles.logoSection}>
             <div style={styles.logo}>🏛️</div>
-            <h1 style={styles.headerTitle}>Banque de projets - Porteur</h1>
+            <h1 style={styles.headerTitle}>Banque de projets</h1>
           </div>
           <nav style={styles.mainNav}>
-            <a href="/project_catalog" style={styles.navLink}>📊 Projets</a>
-            <a href="/submit_page" style={{...styles.navLink, ...styles.activeNavLink}}>➕ Nouveau Projet</a>
+            <a href="/project_catalog_porteur" style={styles.navLink}>📊 Projets</a>
+            <a href="/submit_page" style={{...styles.navLink, ...styles.activeNavLink}}>
+              {isEditMode ? '✏️ Modifier Projet' : '➕ Nouveau Projet'}
+            </a>
             <a href="/articles" style={styles.navLink}>📰 Articles</a>
             <a href="/dashboard" style={styles.navLink}>📈 Dashboard</a>
             <a href="/rendezvous" style={styles.navLink}>📅 Rendez-vous</a>
@@ -392,9 +483,10 @@ const SubmitProject = () => {
         <div style={styles.gridContainer}>
           {/* Form Section */}
           <div style={styles.formCard}>
-            <h2 style={styles.formTitle}>Soumettre un projet</h2>
+            <h2 style={styles.formTitle}>
+              {isEditMode ? '✏️ Modifier le projet' : 'Soumettre un projet'}
+            </h2>
             
-            {/* Submit Message */}
             {submitMessage && (
               <div style={{
                 ...styles.submitMessage,
@@ -407,6 +499,7 @@ const SubmitProject = () => {
             )}
             
             <div style={styles.formContent}>
+              {/* Rest of your form fields - same as before */}
               {/* Basic Information */}
               <div style={styles.section}>
                 <h3 style={styles.sectionTitle}>Informations de base</h3>
@@ -574,7 +667,9 @@ const SubmitProject = () => {
                 
                 <div style={styles.gridTwo}>
                   <div style={styles.fieldGroup}>
-                    <label style={styles.label}>Image du projet</label>
+                    <label style={styles.label}>
+                      Image du projet {isEditMode && formData.existingImageUrl && '(Actuelle)'}
+                    </label>
                     <div style={styles.fileUploadContainer}>
                       <input
                         type="file"
@@ -586,7 +681,13 @@ const SubmitProject = () => {
                       />
                       <label htmlFor="image-upload" style={styles.fileUploadLabel}>
                         <ImageIcon size={20} />
-                        <span>{formData.image ? formData.image.name : 'Choisir une image'}</span>
+                        <span>
+                          {formData.image 
+                            ? formData.image.name 
+                            : isEditMode && formData.existingImageUrl 
+                              ? 'Changer l\'image actuelle' 
+                              : 'Choisir une image'}
+                        </span>
                       </label>
                       {imagePreview && (
                         <div style={styles.imagePreviewContainer}>
@@ -597,7 +698,9 @@ const SubmitProject = () => {
                   </div>
 
                   <div style={styles.fieldGroup}>
-                    <label style={styles.label}>Fiche projet (PDF)</label>
+                    <label style={styles.label}>
+                      Fiche projet (PDF) {isEditMode && formData.existingPdfUrl && '(Actuelle)'}
+                    </label>
                     <div style={styles.fileUploadContainer}>
                       <input
                         type="file"
@@ -609,7 +712,12 @@ const SubmitProject = () => {
                       />
                       <label htmlFor="pdf-upload" style={styles.fileUploadLabel}>
                         <FileText size={20} />
-                        <span>{pdfFileName || 'Choisir un PDF'}</span>
+                        <span>
+                          {pdfFileName || 
+                            (isEditMode && formData.existingPdfUrl 
+                              ? 'Changer le PDF actuel' 
+                              : 'Choisir un PDF')}
+                        </span>
                       </label>
                       {pdfFileName && (
                         <div style={styles.pdfIndicator}>
@@ -622,7 +730,7 @@ const SubmitProject = () => {
                 </div>
               </div>
 
-              {/* Additional Details */}
+              {/* Additional Details - same as before */}
               <div style={styles.section}>
                 <h3 style={styles.sectionTitle}>Détails supplémentaires</h3>
                 
@@ -701,12 +809,14 @@ const SubmitProject = () => {
                 }}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Soumission en cours...' : 'Soumettre le projet'}
+                {isSubmitting 
+                  ? (isEditMode ? 'Modification en cours...' : 'Soumission en cours...') 
+                  : (isEditMode ? 'Modifier le projet' : 'Soumettre le projet')}
               </button>
             </div>
           </div>
 
-          {/* Preview Section */}
+          {/* Preview Section - same as before */}
           <div style={styles.previewCard}>
             <div style={styles.previewHeader}>
               <span style={styles.previewIcon}>👁️</span>
@@ -757,12 +867,12 @@ const SubmitProject = () => {
               </div>
 
               {/* PDF File Indicator */}
-              {pdfFileName && (
+              {(pdfFileName || (isEditMode && formData.existingPdfUrl)) && (
                 <div style={styles.pdfSection}>
                   <h4 style={styles.subHeading}>📄 Fiche projet disponible</h4>
                   <div style={styles.pdfDownloadBox}>
                     <FileText size={24} />
-                    <span>{pdfFileName}</span>
+                    <span>{pdfFileName || 'Fiche projet actuelle'}</span>
                   </div>
                 </div>
               )}
@@ -815,17 +925,18 @@ const SubmitProject = () => {
                 <h3 style={styles.sectionHeading}>Description</h3>
                 
                 {formData.goal && (
-                <div style={styles.descriptionItem}>
-                 <h4 style={styles.subHeading}>Objectif du projet</h4>
-                  <p style={styles.descriptionText}>{formData.goal}</p>  // ✅ CORRECT!
-              </div>
-               )}
-               {formData.technology && (
-                <div style={styles.descriptionItem}>
-                <h4 style={styles.subHeading}>Technologie utilisée</h4>
-                <p style={styles.descriptionText}>{formData.technology}</p>
-                </div>
-               )}
+                  <div style={styles.descriptionItem}>
+                    <h4 style={styles.subHeading}>Objectif du projet</h4>
+                    <p style={styles.descriptionText}>{formData.goal}</p>
+                  </div>
+                )}
+                
+                {formData.technology && (
+                  <div style={styles.descriptionItem}>
+                    <h4 style={styles.subHeading}>Technologie utilisée</h4>
+                    <p style={styles.descriptionText}>{formData.technology}</p>
+                  </div>
+                )}
                 
                 {formData.impact && (
                   <div style={styles.descriptionItem}>
@@ -902,6 +1013,25 @@ const styles = {
     fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif'
   },
   
+  // Loading styles
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '50vh',
+    gap: '1rem'
+  },
+  
+  loadingSpinner: {
+    width: '50px',
+    height: '50px',
+    border: '4px solid #f3f3f3',
+    borderTop: '4px solid #8B4513',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite'
+  },
+  
   // Header styles matching catalog design exactly
   catalogHeader: {
     background: 'linear-gradient(135deg, #8B4513 0%, #A0522D 100%)',
@@ -909,80 +1039,77 @@ const styles = {
     position: 'sticky',
     top: 0,
     zIndex: 100,
-    padding: '0.75rem 0'
+    padding: '1rem 0'
   },
-  
+
   headerContent: {
-    maxWidth: '1400px',
+    maxWidth: '1200px',
     margin: '0 auto',
     padding: '0 2rem',
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    minHeight: '60px'
+    alignItems: 'center'
   },
-  
+
   logoSection: {
     display: 'flex',
     alignItems: 'center',
     gap: '1rem'
   },
-  
+
   logo: {
-    fontSize: '1.8rem',
+    fontSize: '2rem',
     background: 'rgba(255,255,255,0.2)',
-    padding: '0.4rem',
-    borderRadius: '10px',
+    padding: '0.5rem',
+    borderRadius: '12px',
     backdropFilter: 'blur(10px)'
   },
-  
+
   headerTitle: {
     color: 'white',
-    fontSize: '1.3rem',
+    fontSize: '1.5rem',
     fontWeight: '600',
     margin: 0
   },
-  
+
   mainNav: {
     display: 'flex',
-    gap: '0.75rem',
+    gap: '1rem',
     alignItems: 'center'
   },
-  
+
   navLink: {
     color: 'rgba(255,255,255,0.9)',
     textDecoration: 'none',
-    padding: '0.4rem 0.8rem',
-    borderRadius: '6px',
+    padding: '0.5rem 1rem',
+    borderRadius: '8px',
     transition: 'all 0.3s ease',
     fontWeight: '500',
     border: 'none',
     background: 'none',
     cursor: 'pointer',
     fontFamily: 'inherit',
-    fontSize: '0.9rem',
-    whiteSpace: 'nowrap'
+    fontSize: 'inherit'
   },
-  
+
   activeNavLink: {
     background: 'rgba(255,255,255,0.2)',
     color: 'white',
     backdropFilter: 'blur(10px)'
   },
-  
+
   logoutBtn: {
     color: 'rgba(255,255,255,0.9)',
     textDecoration: 'none',
-    padding: '0.4rem 0.8rem',
-    borderRadius: '6px',
+    padding: '0.5rem 1rem',
+    borderRadius: '8px',
     transition: 'all 0.3s ease',
     fontWeight: '500',
     border: '1px solid rgba(220, 53, 69, 0.3)',
     cursor: 'pointer',
     fontFamily: 'inherit',
-    fontSize: '0.9rem',
-    background: 'rgba(220, 53, 69, 0.2)',
-    whiteSpace: 'nowrap'
+    fontSize: 'inherit',
+    background: 'rgba(220, 53, 69, 0.2)'
   },
   
   mainContainer: {
@@ -1401,4 +1528,5 @@ const styles = {
     borderRadius: '8px'
   }
 };
+
 export default SubmitProject;
