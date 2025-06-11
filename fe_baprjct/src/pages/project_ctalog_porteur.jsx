@@ -214,17 +214,17 @@ const ProjectCatalogPorteur = () => {
   };
 
   // Handle modify button click
-const handleModifyClick = (project) => {
-  // Navigate to submit page with project ID for editing
-  const projectId = project.rawProject?.id || project.id;
-  
-  if (projectId) {
-    // Redirect to submit page with edit mode
-    window.location.href = `/submit_page?id=${projectId}`;
-  } else {
-    alert('❌ Impossible de modifier ce projet: ID manquant');
-  }
-};
+  const handleModifyClick = (project) => {
+    // Navigate to submit page with project ID for editing
+    const projectId = project.rawProject?.id || project.id;
+
+    if (projectId) {
+      // Redirect to submit page with edit mode
+      window.location.href = `/submit_page?id=${projectId}`;
+    } else {
+      alert('❌ Impossible de modifier ce projet: ID manquant');
+    }
+  };
   // Initial load
   useEffect(() => {
     fetchProjects(0);
@@ -239,8 +239,8 @@ const handleModifyClick = (project) => {
   }, [searchTerm, selectedProvince, selectedSector, selectedBudget]);
 
   useEffect(() => {
-  console.log('🖼️ Image URLs:', projects.map(p => ({ title: p.title, image: p.image })));
-}, [projects]);
+    console.log('🖼️ Image URLs:', projects.map(p => ({ title: p.title, image: p.image })));
+  }, [projects]);
   // Handle page changes
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -428,7 +428,13 @@ const handleModifyClick = (project) => {
                 </div>
 
                 <div className="project-actions">
-                  <button className="btn btn-primary">
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      const projectId = project.rawProject?.id || project.id;
+                      window.location.href = `/project_details_page?id=${projectId}`;
+                    }}
+                  >
                     <Eye size={16} />
                     Détails
                   </button>

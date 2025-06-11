@@ -12,13 +12,12 @@ import java.util.List;
 
 @Repository
 public interface InvestmentRepository extends JpaRepository<Investment, Long> {
-    
-    // Méthodes utilisées par InvestmentService
+
     List<Investment> findByUserOrderByCreatedAtDesc(User user);
-    
+
     @Query("SELECT SUM(i.amount) FROM Investment i WHERE i.user = :user")
     BigDecimal getTotalInvestmentByUser(@Param("user") User user);
-    
+
     @Query("SELECT i.investmentType, SUM(i.amount) FROM Investment i WHERE i.user = :user GROUP BY i.investmentType")
     List<Object[]> getInvestmentsByTypeForUser(@Param("user") User user);
 }

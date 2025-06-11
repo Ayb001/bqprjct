@@ -321,6 +321,38 @@ public class ProjectController {
     }
 
     /**
+     * 🆕 NEW: PUT /api/projects/{id}/json - Update project with JSON only (ADMIN or PORTEUR owner)
+     */
+    @PutMapping(value = "/{id}/json", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("hasRole('ADMIN') or hasRole('PORTEUR')")
+    public ResponseEntity<ApiResponse<ProjectDTO>> updateProjectJson(
+            @PathVariable Long id,
+            @Valid @RequestBody ProjectCreateRequest request,
+            Authentication authentication) {
+
+        try {
+            String username = authentication.getName();
+            System.out.println("🔄 Updating project " + id + " with JSON data for user: " + username);
+
+            ProjectDTO updatedProject = projectService.updateProject(id, request, null, null, username);
+
+            System.out.println("✅ Project updated (JSON): " + updatedProject.getTitle() + " by " + username);
+
+            return ResponseEntity.ok(ApiResponse.success(updatedProject, "Projet mis à jour avec succès"));
+
+        } catch (RuntimeException e) {
+            System.err.println("❌ Project update error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error("Projet non trouvé ou accès refusé: " + e.getMessage()));
+        } catch (Exception e) {
+            System.err.println("❌ Unexpected error during project update: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Erreur lors de la mise à jour du projet: " + e.getMessage()));
+        }
+    }
+
+    /**
      * PUT /api/projects/{id} - Modifier un projet (ADMIN ou propriétaire PORTEUR)
      * 🆕 UPDATED: Now handles PDF files too
      */

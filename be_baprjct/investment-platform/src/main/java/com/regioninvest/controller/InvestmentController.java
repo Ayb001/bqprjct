@@ -1,5 +1,6 @@
 package com.regioninvest.controller;
 
+import com.regioninvest.dto.ApiResponse;
 import com.regioninvest.dto.InvestmentRequest;
 import com.regioninvest.entity.Investment;
 import com.regioninvest.entity.User;
@@ -32,6 +33,28 @@ public class InvestmentController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
         return userService.findByUsername(username).orElseThrow();
+    }
+
+    @PostMapping("/rendezvous")
+    public ResponseEntity<ApiResponse<String>> createRendezVous(@RequestBody Map<String, Object> request) {
+        try {
+            com.regioninvest.entity.InvestmentRequest saved = investmentService.saveRendezVousRequest(request);
+            return ResponseEntity.ok(ApiResponse.success("Demande de rendez-vous soumise avec succès"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Erreur lors de la soumission: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/rendezvous")
+    public ResponseEntity<ApiResponse<List<com.regioninvest.entity.InvestmentRequest>>> getAllRendezVous() {
+        try {
+            List<com.regioninvest.entity.InvestmentRequest> requests = investmentService.getAllRendezVousRequests();
+            return ResponseEntity.ok(ApiResponse.success(requests));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Erreur lors de la récupération: " + e.getMessage()));
+        }
     }
 
     @PostMapping

@@ -13,6 +13,18 @@ const ArticlesPage = () => {
   const [viewMode, setViewMode] = useState('grid');
   const [sortBy, setSortBy] = useState('date-desc');
 
+  // Handle logout function
+  const handleLogout = () => {
+    // Clear all authentication tokens
+    localStorage.removeItem('token');
+    localStorage.removeItem('jwt');
+    localStorage.removeItem('user');
+    localStorage.removeItem('userRole');
+    
+    // Redirect to home or login page
+    window.location.href = '/';
+  };
+
   useEffect(() => {
     loadArticles();
     loadSectors();
@@ -253,24 +265,23 @@ const ArticlesPage = () => {
 
   return (
     <div style={styles.container}>
-      {/* Navigation */}
-      <nav style={styles.nav}>
-        <div style={styles.navContainer}>
-          <div style={styles.navBrand}>
-            <div style={styles.logo}>
-              <div style={styles.logoIcon}>🏛️</div>
-            </div>
-            <span style={styles.brandText}>Banque de projets</span>
+      {/* Updated Navigation to match Catalog design */}
+      <header style={styles.catalogHeader}>
+        <div style={styles.headerContent}>
+          <div style={styles.logoSection}>
+            <div style={styles.logo}>🏛️</div>
+            <h1 style={styles.headerTitle}>Banque de projets</h1>
           </div>
-          <div style={styles.navLinks}>
-            <a href="#" style={styles.navLink}>Accueil</a>
-            <a href="#" style={{...styles.navLink, ...styles.activeLink}}>Articles</a>
-            <a href="#" style={styles.navLink}>Projets</a>
-            <a href="#" style={styles.navLink}>À propos</a>
-            <a href="#" style={styles.navLink}>Contact</a>
-          </div>
+          <nav style={styles.mainNav}>
+            <a href="/project_catalog_porteur" style={styles.navLink}>📊 Projets</a>
+            <a href="/submit_page" style={styles.navLink}>➕ Nouveau Projet</a>
+            <a href="/articles" style={{...styles.navLink, ...styles.activeNavLink}}>📰 Articles</a>
+            <a href="/dashboard" style={styles.navLink}>📈 Dashboard</a>
+            <a href="/rendezvous" style={styles.navLink}>📅 Rendez-vous</a>
+            <button onClick={handleLogout} style={styles.logoutBtn}>🚪 Déconnexion</button>
+          </nav>
         </div>
-      </nav>
+      </header>
 
       <div style={styles.mainContainer}>
         <div style={styles.pageHeader}>
@@ -476,57 +487,91 @@ const ArticlesPage = () => {
 const styles = {
   container: {
     minHeight: '100vh',
-    backgroundColor: '#f5f5f5',
-    fontFamily: 'Arial, sans-serif'
+    backgroundColor: '#f8f9fa',
+    fontFamily: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif'
   },
-  nav: {
-    backgroundColor: '#8B4513',
-    color: 'white',
-    padding: '1rem 1.5rem',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+
+  // Updated Header styles to match catalog design exactly
+  catalogHeader: {
+    background: 'linear-gradient(135deg, #8B4513 0%, #A0522D 100%)',
+    boxShadow: '0 2px 20px rgba(0,0,0,0.1)',
+    position: 'sticky',
+    top: 0,
+    zIndex: 100,
+    padding: '1rem 0'
   },
-  navContainer: {
+
+  headerContent: {
     maxWidth: '1200px',
     margin: '0 auto',
+    padding: '0 2rem',
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap'
-  },
-  navBrand: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.75rem'
-  },
-  logo: {
-    display: 'flex',
     alignItems: 'center'
   },
-  logoIcon: {
-    fontSize: '1.5rem',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    padding: '0.5rem',
-    borderRadius: '8px'
-  },
-  brandText: {
-    fontSize: '1.25rem',
-    fontWeight: 'bold'
-  },
-  navLinks: {
+
+  logoSection: {
     display: 'flex',
-    gap: '1.5rem',
-    flexWrap: 'wrap'
+    alignItems: 'center',
+    gap: '1rem'
   },
-  navLink: {
+
+  logo: {
+    fontSize: '2rem',
+    background: 'rgba(255,255,255,0.2)',
+    padding: '0.5rem',
+    borderRadius: '12px',
+    backdropFilter: 'blur(10px)'
+  },
+
+  headerTitle: {
     color: 'white',
+    fontSize: '1.5rem',
+    fontWeight: '600',
+    margin: 0
+  },
+
+  mainNav: {
+    display: 'flex',
+    gap: '1rem',
+    alignItems: 'center'
+  },
+
+  navLink: {
+    color: 'rgba(255,255,255,0.9)',
     textDecoration: 'none',
     padding: '0.5rem 1rem',
-    borderRadius: '6px',
-    transition: 'background-color 0.3s'
+    borderRadius: '8px',
+    transition: 'all 0.3s ease',
+    fontWeight: '500',
+    border: 'none',
+    background: 'none',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    fontSize: 'inherit'
   },
-  activeLink: {
-    backgroundColor: 'rgba(255,255,255,0.2)'
+
+  activeNavLink: {
+    background: 'rgba(255,255,255,0.2)',
+    color: 'white',
+    backdropFilter: 'blur(10px)'
   },
+
+  logoutBtn: {
+    color: 'rgba(255,255,255,0.9)',
+    textDecoration: 'none',
+    padding: '0.5rem 1rem',
+    borderRadius: '8px',
+    transition: 'all 0.3s ease',
+    fontWeight: '500',
+    border: '1px solid rgba(220, 53, 69, 0.3)',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    fontSize: 'inherit',
+    background: 'rgba(220, 53, 69, 0.2)'
+  },
+
+  // Rest of the styles remain exactly the same
   mainContainer: {
     maxWidth: '1400px',
     margin: '0 auto',
@@ -906,4 +951,48 @@ const styles = {
   }
 };
 
+// Add CSS animations and hover effects
+const styleSheet = document.createElement("style");
+styleSheet.innerText = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  .nav-link:hover {
+    background: rgba(255,255,255,0.15) !important;
+    color: white !important;
+  }
+  
+  .logout-btn:hover {
+    background: rgba(220, 53, 69, 0.3) !important;
+    border-color: rgba(220, 53, 69, 0.5) !important;
+  }
+  
+  .article-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  
+  .clear-button:hover {
+    background-color: #c82333 !important;
+  }
+  
+  .view-button:hover {
+    border-color: #8B4513 !important;
+    color: #8B4513 !important;
+  }
+  
+  .popular-tag:hover {
+    background-color: #dee2e6 !important;
+  }
+  
+  .tag:hover {
+    background-color: #e9ecef !important;
+  }
+  
+  .retry-button:hover {
+    background-color: #A0522D !important;
+  }
+`;
 export default ArticlesPage;

@@ -261,8 +261,9 @@ const SubmitProject = () => {
 
       let response;
       
-      // Determine if we need multipart upload
-      const hasNewFiles = formData.image || formData.pdfFile;
+      // 🆕 FIXED: Check for NEW files only (not existing ones)
+      const hasNewFiles = (formData.image && formData.image instanceof File) || 
+                          (formData.pdfFile && formData.pdfFile instanceof File);
       
       if (hasNewFiles) {
         console.log('📂 Using multipart upload endpoint...');
@@ -270,16 +271,16 @@ const SubmitProject = () => {
         const formDataToSend = new FormData();
         formDataToSend.append('project', JSON.stringify(projectData));
         
-        if (formData.image) {
+        if (formData.image && formData.image instanceof File) {
           formDataToSend.append('image', formData.image);
         }
-        if (formData.pdfFile) {
+        if (formData.pdfFile && formData.pdfFile instanceof File) {
           formDataToSend.append('pdfFile', formData.pdfFile);
         }
 
         // Choose endpoint based on mode
         const url = isEditMode 
-          ? `http://localhost:8080/api/projects/${projectId}/upload`
+          ? `http://localhost:8080/api/projects/${projectId}` // Keep multipart endpoint for file uploads
           : 'http://localhost:8080/api/projects/upload';
         
         const method = isEditMode ? 'PUT' : 'POST';
@@ -295,8 +296,9 @@ const SubmitProject = () => {
       } else {
         console.log('📝 Using JSON endpoint...');
         
+        // 🆕 FIXED: Use the new JSON endpoint for edit mode
         const url = isEditMode 
-          ? `http://localhost:8080/api/projects/${projectId}`
+          ? `http://localhost:8080/api/projects/${projectId}/json` // NEW JSON endpoint for edit
           : 'http://localhost:8080/api/projects';
         
         const method = isEditMode ? 'PUT' : 'POST';
@@ -312,6 +314,7 @@ const SubmitProject = () => {
       }
 
       console.log('📡 Response status:', response.status);
+      console.log('📡 Response URL:', response.url);
 
       let result;
       try {
@@ -364,6 +367,11 @@ const SubmitProject = () => {
               setPdfFileName('');
               setSubmitMessage('');
             }, 3000);
+          } else {
+            // For edit mode, redirect to project catalog after success
+            setTimeout(() => {
+              window.location.href = '/project_catalog_porteur';
+            }, 2000);
           }
           
         } else {

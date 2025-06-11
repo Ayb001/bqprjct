@@ -6,23 +6,23 @@ const ProjectCatalog = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // Filter states (keep your existing logic)
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProvince, setSelectedProvince] = useState('');
   const [selectedSector, setSelectedSector] = useState('');
   const [selectedBudget, setSelectedBudget] = useState('');
-  
+
   // UI states (keep your existing logic)
   const [viewMode, setViewMode] = useState('grid');
   const [currentPage, setCurrentPage] = useState(1);
   const [showInvestmentModal, setShowInvestmentModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
-  
+
   // Backend pagination data
   const [totalPages, setTotalPages] = useState(0);
   const [totalProjects, setTotalProjects] = useState(0);
-  
+
   // Filter options from backend
   const [filterOptions, setFilterOptions] = useState({
     provinces: ["Toutes les provinces"],
@@ -34,7 +34,7 @@ const ProjectCatalog = () => {
   const fetchProjects = async (page = 0) => {
     try {
       setLoading(true);
-      
+
       // Build query parameters
       const params = new URLSearchParams({
         page: page.toString(),
@@ -58,16 +58,16 @@ const ProjectCatalog = () => {
       }
 
       const response = await fetch(`http://localhost:8080/api/projects?${params}`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const apiResponse = await response.json();
-      
+
       if (apiResponse.success && apiResponse.data) {
         const { projects: projectsList, pagination, filters } = apiResponse.data;
-        
+
         // Transform backend data to match your existing project structure
         const transformedProjects = (projectsList || []).map(project => ({
           id: project.id,
@@ -84,16 +84,16 @@ const ProjectCatalog = () => {
           // Keep backend data for potential future use
           rawProject: project
         }));
-        
+
         setProjects(transformedProjects);
-        
+
         // Update pagination info
         if (pagination) {
           setCurrentPage(pagination.currentPage + 1); // Convert from 0-based to 1-based
           setTotalPages(pagination.totalPages);
           setTotalProjects(pagination.totalProjects);
         }
-        
+
         // Update filter options
         if (filters) {
           setFilterOptions({
@@ -105,7 +105,7 @@ const ProjectCatalog = () => {
       } else {
         throw new Error(apiResponse.error || 'Failed to fetch projects');
       }
-      
+
     } catch (error) {
       console.error('Error fetching projects:', error);
       setError(error.message);
@@ -152,6 +152,39 @@ const ProjectCatalog = () => {
     // For now, keeping your existing alert
     alert(`Demande d'investissement soumise pour: ${selectedProject.title}`);
     setShowInvestmentModal(false);
+  };
+
+  // 🆕 PDF Download Handler
+  const handleDownloadPDF = async (project) => {
+    try {
+      if (!project.rawProject?.id) {
+        alert('❌ Aucun fichier PDF disponible pour ce projet');
+        return;
+      }
+
+      const token = localStorage.getItem('token') || localStorage.getItem('jwt');
+
+      const response = await fetch(`http://localhost:8080/api/projects/${project.rawProject.id}/pdf`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${project.title}_fiche.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        alert('❌ Impossible de télécharger le fichier PDF');
+      }
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('❌ Erreur lors du téléchargement');
+    }
   };
 
   // Loading state
@@ -997,7 +1030,7 @@ const ProjectCatalog = () => {
           outline-offset: 2px;
         }
       `}</style>
-      
+
       {/* Header - KEEPING EXACTLY THE SAME */}
       <header className="catalog-header">
         <div className="header-content">
@@ -1034,7 +1067,7 @@ const ProjectCatalog = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          
+
           <div className="filters-row">
             <select
               value={selectedProvince}
@@ -1103,17 +1136,17 @@ const ProjectCatalog = () => {
                 <img src={project.image} alt={project.title} />
                 <div className="sector-badge">{project.sector}</div>
               </div>
-              
+
               <div className="project-content">
                 <h3 className="project-title">{project.title}</h3>
-                
+
                 <div className="project-location">
                   <MapPin size={16} />
                   <span>{project.location}</span>
                 </div>
-                
+
                 <p className="project-description">{project.description}</p>
-                
+
                 <div className="project-stats">
                   <div className="stat">
                     <DollarSign size={16} />
@@ -1124,17 +1157,26 @@ const ProjectCatalog = () => {
                     <span>{project.jobs} emplois</span>
                   </div>
                 </div>
-                
+
                 <div className="project-actions">
-                  <button className="btn btn-primary">
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      const projectId = project.rawProject?.id || project.id;
+                      window.location.href = `/project_details_page?id=${projectId}`;
+                    }}
+                  >
                     <Eye size={16} />
                     Voir les détails
                   </button>
-                  <button className="btn btn-secondary">
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => handleDownloadPDF(project)}
+                  >
                     <Download size={16} />
                     Fiche
                   </button>
-                  <button 
+                  <button
                     className="btn btn-accent"
                     onClick={() => handleInvestmentRequest(project)}
                   >
@@ -1158,7 +1200,7 @@ const ProjectCatalog = () => {
           >
             Précédent
           </button>
-          
+
           {[...Array(totalPages)].map((_, index) => (
             <button
               key={index + 1}
@@ -1168,7 +1210,7 @@ const ProjectCatalog = () => {
               {index + 1}
             </button>
           ))}
-          
+
           <button
             className="pagination-btn"
             onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
@@ -1185,44 +1227,44 @@ const ProjectCatalog = () => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Demande d'Investissement</h3>
-              <button 
+              <button
                 className="modal-close"
                 onClick={() => setShowInvestmentModal(false)}
               >
                 ×
               </button>
             </div>
-            
+
             <div className="modal-body">
               <h4>{selectedProject?.title}</h4>
               <p>Soumettez votre demande d'investissement pour ce projet.</p>
-              
+
               <div className="investment-form">
                 <div className="form-group">
                   <label>Nom complet *</label>
                   <input type="text" required />
                 </div>
-                
+
                 <div className="form-group">
                   <label>Email *</label>
                   <input type="email" required />
                 </div>
-                
+
                 <div className="form-group">
                   <label>Téléphone *</label>
                   <input type="tel" required />
                 </div>
-                
+
                 <div className="form-group">
                   <label>Montant d'investissement souhaité</label>
                   <input type="text" placeholder="Ex: 500,000 Dhs" />
                 </div>
-                
+
                 <div className="form-group">
                   <label>Message</label>
                   <textarea rows="4" placeholder="Décrivez votre intérêt pour ce projet..."></textarea>
                 </div>
-                
+
                 <div className="form-actions">
                   <button className="btn btn-secondary" onClick={() => setShowInvestmentModal(false)}>
                     Annuler

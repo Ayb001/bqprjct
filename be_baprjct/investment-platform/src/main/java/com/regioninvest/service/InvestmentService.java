@@ -2,12 +2,17 @@ package com.regioninvest.service;
 
 import com.regioninvest.dto.InvestmentRequest;
 import com.regioninvest.entity.Investment;
+import com.regioninvest.entity.Project;
+import com.regioninvest.entity.RequestStatus;
 import com.regioninvest.entity.User;
 import com.regioninvest.repository.InvestmentRepository;
+import com.regioninvest.repository.InvestmentRequestRepository;
+import com.regioninvest.repository.ProjectRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +22,47 @@ public class InvestmentService {
 
     @Autowired
     private InvestmentRepository investmentRepository;
+
+    @Autowired
+    private InvestmentRequestRepository investmentRequestRepository;
+
+    @Autowired
+    private ProjectRepository projectRepository;
+
+    public com.regioninvest.entity.InvestmentRequest saveRendezVousRequest(Map<String, Object> requestData) {
+        com.regioninvest.entity.InvestmentRequest request = new com.regioninvest.entity.InvestmentRequest();
+
+        if (requestData.get("projectId") != null) {
+            Long projectId = Long.valueOf(requestData.get("projectId").toString());
+            Project project = projectRepository.findById(projectId).orElse(null);
+            request.setProject(project);
+        }
+
+        request.setFullName((String) requestData.get("fullName"));
+        request.setEmail((String) requestData.get("email"));
+        request.setPhone((String) requestData.get("phone"));
+
+        if (requestData.get("investmentAmount") != null) {
+            String amountStr = requestData.get("investmentAmount").toString();
+            if (!amountStr.isEmpty()) {
+                try {
+                    request.setInvestmentAmount(new BigDecimal(amountStr.replaceAll("[^0-9.]", "")));
+                } catch (Exception e) {
+                    request.setInvestmentAmount(BigDecimal.ZERO);
+                }
+            }
+        }
+
+        request.setMessage((String) requestData.get("message"));
+        request.setStatus(RequestStatus.PENDING);
+        request.setCreatedAt(LocalDateTime.now());
+
+        return investmentRequestRepository.save(request);
+    }
+
+    public List<com.regioninvest.entity.InvestmentRequest> getAllRendezVousRequests() {
+        return investmentRequestRepository.findAll();
+    }
 
     public Investment createInvestment(User user, InvestmentRequest request) {
         Investment investment = new Investment();
