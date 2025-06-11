@@ -6,12 +6,139 @@ const PorteurDashboard = () => {
   const [projects, setProjects] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [userIssues, setUserIssues] = useState([]);
+  const [rendezVousRequests, setRendezVousRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUserRole, setSelectedUserRole] = useState('');
   const [selectedProjectStatus, setSelectedProjectStatus] = useState('');
 
-  // Mock data - Same as admin but with limited access
+  // API Base URL
+  const API_BASE = 'http://localhost:8080/api';
+
+  // Token management
+  const getAuthToken = () => localStorage.getItem('token');
+  
+  const authFetch = async (url, options = {}) => {
+    const token = getAuthToken();
+    return fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+        ...options.headers,
+      },
+    });
+  };
+
+  // API calls with your actual endpoints
+  const fetchUsers = async () => {
+    try {
+      console.log('Fetching users from:', `${API_BASE}/admin/users`);
+      // Since you don't have a dedicated admin/users endpoint, we'll skip this for now
+      // or try to use a different endpoint
+      console.log('Users endpoint not available, using mock data');
+      setUsers(mockUsers);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      setUsers(mockUsers);
+    }
+  };
+
+  const fetchProjects = async () => {
+    try {
+      console.log('Fetching projects from:', `${API_BASE}/projects`);
+      const response = await authFetch(`${API_BASE}/projects`);
+      console.log('Projects response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Projects raw data:', data);
+        
+        // Your API returns: ApiResponse<ProjectResponse>
+        // ProjectResponse contains: projects: ProjectDTO[], pagination, etc.
+        let projectData = [];
+        
+        if (data.success && data.data && data.data.projects) {
+          projectData = data.data.projects;
+        } else if (data.data && Array.isArray(data.data)) {
+          projectData = data.data;
+        } else if (Array.isArray(data)) {
+          projectData = data;
+        }
+        
+        console.log('Projects processed data:', projectData);
+        setProjects(Array.isArray(projectData) ? projectData : []);
+      } else {
+        console.error('Projects API failed with status:', response.status);
+        const errorText = await response.text();
+        console.error('Projects API error:', errorText);
+        setProjects(mockProjects);
+      }
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      setProjects(mockProjects);
+    }
+  };
+
+  const fetchRendezVousRequests = async () => {
+    try {
+      console.log('Fetching rendez-vous from:', `${API_BASE}/investments/rendezvous`);
+      const response = await authFetch(`${API_BASE}/investments/rendezvous`);
+      console.log('RendezVous response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('RendezVous raw data:', data);
+        
+        // Your API returns: ApiResponse<List<InvestmentRequest>>
+        let requests = [];
+        
+        if (data.success && data.data) {
+          requests = data.data;
+        } else if (Array.isArray(data.data)) {
+          requests = data.data;
+        } else if (Array.isArray(data)) {
+          requests = data;
+        }
+        
+        console.log('RendezVous processed data:', requests);
+        const requestsArray = Array.isArray(requests) ? requests : [];
+        setRendezVousRequests(requestsArray);
+        
+        // Convert to appointments format
+        const appointmentData = requestsArray.map(req => ({
+          id: req.id,
+          title: `Demande d'investissement - ${req.project?.title || 'Projet'}`,
+          client: req.fullName || req.name || 'Client',
+          email: req.email,
+          phone: req.phone,
+          date: req.createdAt ? new Date(req.createdAt).toLocaleDateString('fr-FR') : 'N/A',
+          time: req.createdAt ? new Date(req.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'N/A',
+          status: req.status === 'PENDING' ? 'En attente' : 
+                  req.status === 'CONFIRMED' ? 'Confirmé' : 
+                  req.status === 'REJECTED' ? 'Rejeté' : req.status || 'En attente',
+          type: 'Demande d\'investissement',
+          location: 'À définir',
+          investmentAmount: req.investmentAmount || req.amount,
+          message: req.message || req.description,
+          project: req.project
+        }));
+        setAppointments(appointmentData);
+      } else {
+        console.error('RendezVous API failed with status:', response.status);
+        const errorText = await response.text();
+        console.error('RendezVous API error:', errorText);
+        setAppointments(mockAppointments);
+        setRendezVousRequests([]);
+      }
+    } catch (error) {
+      console.error('Error fetching rendez-vous:', error);
+      setAppointments(mockAppointments);
+      setRendezVousRequests([]);
+    }
+  };
+
+  // Mock data as fallback
   const mockUsers = [
     {
       id: 1,
@@ -34,28 +161,6 @@ const PorteurDashboard = () => {
       lastLogin: "2025-06-04",
       projects: 0,
       avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100"
-    },
-    {
-      id: 3,
-      name: "Youssef Alami",
-      email: "youssef.alami@email.com",
-      role: "Admin",
-      status: "Active",
-      joinDate: "2023-12-10",
-      lastLogin: "2025-06-04",
-      projects: 5,
-      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100"
-    },
-    {
-      id: 4,
-      name: "Leila Fassi",
-      email: "leila.fassi@email.com",
-      role: "Entrepreneur",
-      status: "Pending",
-      joinDate: "2025-05-30",
-      lastLogin: "2025-06-02",
-      projects: 1,
-      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100"
     }
   ];
 
@@ -71,30 +176,6 @@ const PorteurDashboard = () => {
       progress: 65,
       investors: 2,
       description: "Marketplace pour produits biologiques locaux"
-    },
-    {
-      id: 2,
-      title: "Application de Covoiturage",
-      owner: "Fatima Zarrouk",
-      sector: "Transport",
-      status: "En attente",
-      budget: "120,000 DH",
-      startDate: "2025-04-15",
-      progress: 25,
-      investors: 0,
-      description: "Solution de transport partagé pour les villes marocaines"
-    },
-    {
-      id: 3,
-      title: "Centre de Formation Digital",
-      owner: "Youssef Alami",
-      sector: "Éducation",
-      status: "Complété",
-      budget: "200,000 DH",
-      startDate: "2024-10-01",
-      progress: 100,
-      investors: 5,
-      description: "Formation en ligne pour les compétences digitales"
     }
   ];
 
@@ -108,26 +189,6 @@ const PorteurDashboard = () => {
       status: "Confirmé",
       type: "Présentation",
       location: "Bureau principal"
-    },
-    {
-      id: 2,
-      title: "Entretien Investisseur",
-      client: "Fatima Zarrouk",
-      date: "2025-06-06",
-      time: "10:30",
-      status: "En attente",
-      type: "Entretien",
-      location: "Salle de réunion A"
-    },
-    {
-      id: 3,
-      title: "Suivi Projet Formation",
-      client: "Youssef Alami",
-      date: "2025-06-07",
-      time: "16:00",
-      status: "Confirmé",
-      type: "Suivi",
-      location: "Visioconférence"
     }
   ];
 
@@ -142,71 +203,72 @@ const PorteurDashboard = () => {
       status: "En cours",
       date: "2025-06-03",
       avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100"
-    },
-    {
-      id: 2,
-      user: "Leila Fassi",
-      email: "leila.fassi@email.com",
-      issue: "Erreur lors du téléchargement",
-      description: "Fichiers ne se téléchargent pas correctement",
-      priority: "Moyenne",
-      status: "Nouveau",
-      date: "2025-06-04",
-      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100"
-    },
-    {
-      id: 3,
-      user: "Omar Bennani",
-      email: "omar.bennani@email.com",
-      issue: "Problème de paiement",
-      description: "Transaction échouée lors du paiement",
-      priority: "Haute",
-      status: "Résolu",
-      date: "2025-06-02",
-      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100"
     }
   ];
 
   useEffect(() => {
-    // Simulate API loading
-    setLoading(true);
-    setTimeout(() => {
-      setUsers(mockUsers);
-      setProjects(mockProjects);
-      setAppointments(mockAppointments);
-      setUserIssues(mockUserIssues);
-      setLoading(false);
-    }, 1000);
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchUsers(),
+          fetchProjects(),
+          fetchRendezVousRequests()
+        ]);
+        setUserIssues(mockUserIssues);
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredUsers = Array.isArray(users) ? users.filter(user => {
+    const matchesSearch = user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = !selectedUserRole || user.role === selectedUserRole;
     return matchesSearch && matchesRole;
-  });
+  }) : [];
 
-  const filteredProjects = projects.filter(project => {
-    const matchesSearch = project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         project.owner.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredProjects = Array.isArray(projects) ? projects.filter(project => {
+    const matchesSearch = project.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         project.owner?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = !selectedProjectStatus || project.status === selectedProjectStatus;
     return matchesSearch && matchesStatus;
-  });
+  }) : [];
 
   const getStatusColor = (status) => {
-    switch (status.toLowerCase()) {
+    switch (status?.toLowerCase()) {
       case 'active':
       case 'confirmé':
       case 'complété':
+      case 'confirmed':
+      case 'actif':
         return '#28a745';
       case 'pending':
       case 'en attente':
         return '#ffc107';
       case 'en cours':
         return '#007bff';
+      case 'rejected':
+      case 'rejeté':
+        return '#dc3545';
       default:
         return '#6c757d';
     }
+  };
+
+  const formatCurrency = (amount) => {
+    if (!amount) return '0 DH';
+    return new Intl.NumberFormat('fr-MA', {
+      style: 'currency',
+      currency: 'MAD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount).replace('MAD', 'DH');
   };
 
   const DashboardOverview = () => (
@@ -214,36 +276,44 @@ const PorteurDashboard = () => {
       <div style={styles.statCard}>
         <div style={styles.statIcon}>👥</div>
         <div style={styles.statContent}>
-          <h3 style={styles.statNumber}>{users.length}</h3>
+          <h3 style={styles.statNumber}>{Array.isArray(users) ? users.length : 0}</h3>
           <p style={styles.statLabel}>Utilisateurs totaux</p>
-          <small style={styles.statSubtext}>+{users.filter(u => u.status === 'Active').length} actifs</small>
+          <small style={styles.statSubtext}>
+            +{Array.isArray(users) ? users.filter(u => u.status === 'Active' || u.status === 'ACTIVE').length : 0} actifs
+          </small>
         </div>
       </div>
 
       <div style={styles.statCard}>
         <div style={styles.statIcon}>📋</div>
         <div style={styles.statContent}>
-          <h3 style={styles.statNumber}>{projects.length}</h3>
+          <h3 style={styles.statNumber}>{Array.isArray(projects) ? projects.length : 0}</h3>
           <p style={styles.statLabel}>Projets</p>
-          <small style={styles.statSubtext}>{projects.filter(p => p.status === 'En cours').length} en cours</small>
+          <small style={styles.statSubtext}>
+            {Array.isArray(projects) ? projects.filter(p => p.status === 'En cours' || p.status === 'IN_PROGRESS').length : 0} en cours
+          </small>
         </div>
       </div>
 
       <div style={styles.statCard}>
         <div style={styles.statIcon}>📅</div>
         <div style={styles.statContent}>
-          <h3 style={styles.statNumber}>{appointments.length}</h3>
-          <p style={styles.statLabel}>Rendez-vous</p>
-          <small style={styles.statSubtext}>{appointments.filter(a => a.status === 'Confirmé').length} confirmés</small>
+          <h3 style={styles.statNumber}>{Array.isArray(rendezVousRequests) ? rendezVousRequests.length : 0}</h3>
+          <p style={styles.statLabel}>Demandes RDV</p>
+          <small style={styles.statSubtext}>
+            {Array.isArray(rendezVousRequests) ? rendezVousRequests.filter(r => r.status === 'PENDING').length : 0} en attente
+          </small>
         </div>
       </div>
 
       <div style={styles.statCard}>
-        <div style={styles.statIcon}>🛠️</div>
+        <div style={styles.statIcon}>💰</div>
         <div style={styles.statContent}>
-          <h3 style={styles.statNumber}>{userIssues.filter(i => i.status !== 'Résolu').length}</h3>
-          <p style={styles.statLabel}>Problèmes ouverts</p>
-          <small style={styles.statSubtext}>{userIssues.filter(i => i.priority === 'Haute').length} haute priorité</small>
+          <h3 style={styles.statNumber}>
+            {formatCurrency(Array.isArray(rendezVousRequests) ? rendezVousRequests.reduce((sum, r) => sum + (r.investmentAmount || 0), 0) : 0)}
+          </h3>
+          <p style={styles.statLabel}>Montant demandé</p>
+          <small style={styles.statSubtext}>Total des demandes</small>
         </div>
       </div>
 
@@ -251,27 +321,22 @@ const PorteurDashboard = () => {
       <div style={styles.activityCard}>
         <h3 style={styles.cardTitle}>🔔 Activité récente</h3>
         <div style={styles.activityList}>
-          <div style={styles.activityItem}>
-            <span style={styles.activityDot}></span>
-            <div>
-              <p><strong>Ahmed Benali</strong> a soumis un nouveau projet</p>
-              <small>Il y a 2 heures</small>
+          {Array.isArray(rendezVousRequests) && rendezVousRequests.slice(0, 3).map(request => (
+            <div key={request.id} style={styles.activityItem}>
+              <span style={styles.activityDot}></span>
+              <div>
+                <p><strong>{request.fullName}</strong> a demandé un rendez-vous</p>
+                <small>
+                  {formatCurrency(request.investmentAmount)} - {request.project?.title || 'Projet'}
+                </small>
+                <br />
+                <small>{new Date(request.createdAt).toLocaleDateString('fr-FR')}</small>
+              </div>
             </div>
-          </div>
-          <div style={styles.activityItem}>
-            <span style={styles.activityDot}></span>
-            <div>
-              <p><strong>Fatima Zarrouk</strong> a confirmé un rendez-vous</p>
-              <small>Il y a 4 heures</small>
-            </div>
-          </div>
-          <div style={styles.activityItem}>
-            <span style={styles.activityDot}></span>
-            <div>
-              <p>Nouveau problème utilisateur signalé</p>
-              <small>Il y a 6 heures</small>
-            </div>
-          </div>
+          ))}
+          {(!Array.isArray(rendezVousRequests) || rendezVousRequests.length === 0) && (
+            <p style={{color: '#666', fontStyle: 'italic'}}>Aucune activité récente</p>
+          )}
         </div>
       </div>
 
@@ -280,16 +345,16 @@ const PorteurDashboard = () => {
         <h3 style={styles.cardTitle}>⚡ Actions rapides</h3>
         <div style={styles.actionButtons}>
           <button style={styles.actionButton} onClick={() => setActiveSection('users')}>
-            👥 Voir utilisateurs
+            👥 Voir utilisateurs ({Array.isArray(users) ? users.length : 0})
           </button>
           <button style={styles.actionButton} onClick={() => setActiveSection('projects')}>
-            📋 Voir projets
+            📋 Voir projets ({Array.isArray(projects) ? projects.length : 0})
           </button>
           <button style={styles.actionButton} onClick={() => setActiveSection('appointments')}>
-            📅 Gérer rendez-vous
+            📅 Demandes RDV ({Array.isArray(rendezVousRequests) ? rendezVousRequests.length : 0})
           </button>
           <button style={styles.actionButton} onClick={() => setActiveSection('issues')}>
-            🛠️ Problèmes utilisateurs
+            🛠️ Problèmes ({Array.isArray(userIssues) ? userIssues.length : 0})
           </button>
         </div>
       </div>
@@ -322,9 +387,9 @@ const PorteurDashboard = () => {
             style={styles.filterSelect}
           >
             <option value="">Tous les rôles</option>
-            <option value="Admin">Admin</option>
-            <option value="Entrepreneur">Entrepreneur</option>
-            <option value="Investisseur">Investisseur</option>
+            <option value="ADMIN">Admin</option>
+            <option value="ENTREPRENEUR">Entrepreneur</option>
+            <option value="INVESTOR">Investisseur</option>
           </select>
         </div>
       </div>
@@ -336,7 +401,7 @@ const PorteurDashboard = () => {
               <th style={styles.tableHeaderCell}>Utilisateur</th>
               <th style={styles.tableHeaderCell}>Rôle</th>
               <th style={styles.tableHeaderCell}>Statut</th>
-              <th style={styles.tableHeaderCell}>Projets</th>
+              <th style={styles.tableHeaderCell}>Date d'inscription</th>
               <th style={styles.tableHeaderCell}>Dernière connexion</th>
             </tr>
           </thead>
@@ -345,9 +410,13 @@ const PorteurDashboard = () => {
               <tr key={user.id} style={styles.tableRow}>
                 <td style={styles.tableCell}>
                   <div style={styles.userInfo}>
-                    <img src={user.avatar} alt={user.name} style={styles.userAvatar} />
+                    <img 
+                      src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || user.username)}&background=8B4513&color=fff`} 
+                      alt={user.name || user.username} 
+                      style={styles.userAvatar} 
+                    />
                     <div>
-                      <p style={styles.userName}>{user.name}</p>
+                      <p style={styles.userName}>{user.name || user.username}</p>
                       <p style={styles.userEmail}>{user.email}</p>
                     </div>
                   </div>
@@ -356,12 +425,16 @@ const PorteurDashboard = () => {
                   <span style={styles.roleTag}>{user.role}</span>
                 </td>
                 <td style={styles.tableCell}>
-                  <span style={{...styles.statusTag, backgroundColor: getStatusColor(user.status)}}>
-                    {user.status}
+                  <span style={{...styles.statusTag, backgroundColor: getStatusColor(user.status || 'Active')}}>
+                    {user.status || 'Active'}
                   </span>
                 </td>
-                <td style={styles.tableCell}>{user.projects}</td>
-                <td style={styles.tableCell}>{user.lastLogin}</td>
+                <td style={styles.tableCell}>
+                  {user.createdAt ? new Date(user.createdAt).toLocaleDateString('fr-FR') : user.joinDate || 'N/A'}
+                </td>
+                <td style={styles.tableCell}>
+                  {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString('fr-FR') : 'N/A'}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -396,9 +469,10 @@ const PorteurDashboard = () => {
             style={styles.filterSelect}
           >
             <option value="">Tous les statuts</option>
-            <option value="En cours">En cours</option>
-            <option value="En attente">En attente</option>
-            <option value="Complété">Complété</option>
+            <option value="PENDING">En attente</option>
+            <option value="ACTIVE">Actif</option>
+            <option value="IN_PROGRESS">En cours</option>
+            <option value="COMPLETED">Complété</option>
           </select>
         </div>
       </div>
@@ -409,26 +483,35 @@ const PorteurDashboard = () => {
             <div style={styles.projectHeader}>
               <h3 style={styles.projectTitle}>{project.title}</h3>
               <span style={{...styles.statusTag, backgroundColor: getStatusColor(project.status)}}>
-                {project.status}
+                {project.status === 'PENDING' ? 'En attente' :
+                 project.status === 'IN_PROGRESS' ? 'En cours' :
+                 project.status === 'COMPLETED' ? 'Complété' :
+                 project.status === 'ACTIVE' ? 'Actif' : project.status}
               </span>
             </div>
             
-            <p style={styles.projectOwner}>👤 {project.owner}</p>
+            <p style={styles.projectOwner}>👤 {project.porteurName || project.user?.username || project.owner}</p>
             <p style={styles.projectSector}>🏢 {project.sector}</p>
             <p style={styles.projectDescription}>{project.description}</p>
             
             <div style={styles.projectProgress}>
               <div style={styles.progressLabel}>
-                <span>Progression: {project.progress}%</span>
-                <span>{project.budget}</span>
+                <span>Budget: {formatCurrency(project.budget)}</span>
+                <span>Revenus: {formatCurrency(project.revenue || 0)}</span>
               </div>
               <div style={styles.progressBar}>
-                <div style={{...styles.progressFill, width: `${project.progress}%`}}></div>
+                <div style={{
+                  ...styles.progressFill, 
+                  width: `${project.revenue && project.budget ? 
+                    Math.min((project.revenue / project.budget) * 100, 100) : 0}%`
+                }}></div>
               </div>
             </div>
 
             <div style={styles.projectFooter}>
-              <span style={styles.projectInvestors}>💰 {project.investors} investisseurs</span>
+              <span style={styles.projectInvestors}>
+                📅 {project.createdAt ? new Date(project.createdAt).toLocaleDateString('fr-FR') : 'N/A'}
+              </span>
               <div style={styles.actionButtons}>
                 <button style={styles.viewButton}>
                   👁️ Consulter
@@ -444,12 +527,19 @@ const PorteurDashboard = () => {
   const AppointmentsManagement = () => (
     <div style={styles.managementContainer}>
       <div style={styles.managementHeader}>
-        <h2 style={styles.managementTitle}>📅 Gestion des rendez-vous</h2>
-        <button style={styles.addButton}>+ Nouveau rendez-vous</button>
+        <h2 style={styles.managementTitle}>📅 Demandes de rendez-vous</h2>
+        <div style={styles.appointmentStats}>
+          <span style={styles.appointmentStat}>
+            ⏳ {Array.isArray(rendezVousRequests) ? rendezVousRequests.filter(r => r.status === 'PENDING').length : 0} En attente
+          </span>
+          <span style={styles.appointmentStat}>
+            ✅ {Array.isArray(rendezVousRequests) ? rendezVousRequests.filter(r => r.status === 'CONFIRMED').length : 0} Confirmées
+          </span>
+        </div>
       </div>
 
       <div style={styles.appointmentsGrid}>
-        {appointments.map(appointment => (
+        {Array.isArray(appointments) && appointments.map(appointment => (
           <div key={appointment.id} style={styles.appointmentCard}>
             <div style={styles.appointmentHeader}>
               <h3 style={styles.appointmentTitle}>{appointment.title}</h3>
@@ -460,19 +550,30 @@ const PorteurDashboard = () => {
             
             <div style={styles.appointmentInfo}>
               <p><strong>👤 Client:</strong> {appointment.client}</p>
-              <p><strong>📅 Date:</strong> {appointment.date}</p>
-              <p><strong>🕐 Heure:</strong> {appointment.time}</p>
-              <p><strong>📍 Lieu:</strong> {appointment.location}</p>
-              <p><strong>🎯 Type:</strong> {appointment.type}</p>
+              <p><strong>📧 Email:</strong> {appointment.email}</p>
+              <p><strong>📱 Téléphone:</strong> {appointment.phone}</p>
+              <p><strong>📅 Date demande:</strong> {appointment.date}</p>
+              <p><strong>💰 Montant:</strong> {formatCurrency(appointment.investmentAmount)}</p>
+              {appointment.project && (
+                <p><strong>📋 Projet:</strong> {appointment.project.title}</p>
+              )}
+              {appointment.message && (
+                <p><strong>💬 Message:</strong> {appointment.message}</p>
+              )}
             </div>
 
             <div style={styles.appointmentActions}>
               <button style={styles.confirmButton}>✅ Confirmer</button>
-              <button style={styles.rescheduleButton}>📅 Reporter</button>
-              <button style={styles.editButton}>✏️ Modifier</button>
+              <button style={styles.rescheduleButton}>📅 Planifier</button>
+              <button style={styles.contactButton}>📞 Contacter</button>
             </div>
           </div>
         ))}
+        {(!Array.isArray(appointments) || appointments.length === 0) && (
+          <div style={styles.emptyState}>
+            <p>📭 Aucune demande de rendez-vous pour le moment</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -528,6 +629,11 @@ const PorteurDashboard = () => {
             </div>
           </div>
         ))}
+        {userIssues.length === 0 && (
+          <div style={styles.emptyState}>
+            <p>✨ Aucun problème signalé pour le moment</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -537,7 +643,7 @@ const PorteurDashboard = () => {
       return (
         <div style={styles.loadingContainer}>
           <div style={styles.loader}></div>
-          <p>Chargement du tableau de bord...</p>
+          <p>Chargement des données depuis la base de données...</p>
         </div>
       );
     }
@@ -571,7 +677,12 @@ const PorteurDashboard = () => {
           </div>
           <div style={styles.navLinks}>
             <span style={styles.welcomeText}>Bienvenue, Porteur</span>
-            <button style={styles.logoutButton}>🚪 Déconnexion</button>
+            <button style={styles.logoutButton} onClick={() => {
+              localStorage.removeItem('token');
+              window.location.href = '/login';
+            }}>
+              🚪 Déconnexion
+            </button>
           </div>
         </div>
       </nav>
@@ -601,7 +712,7 @@ const PorteurDashboard = () => {
                   }}
                   onClick={() => setActiveSection('users')}
                 >
-                  👥 Utilisateurs
+                  👥 Utilisateurs ({Array.isArray(users) ? users.length : 0})
                 </button>
                 
                 <button
@@ -611,7 +722,7 @@ const PorteurDashboard = () => {
                   }}
                   onClick={() => setActiveSection('projects')}
                 >
-                  📋 Projets
+                  📋 Projets ({Array.isArray(projects) ? projects.length : 0})
                 </button>
                 
                 <button
@@ -621,7 +732,7 @@ const PorteurDashboard = () => {
                   }}
                   onClick={() => setActiveSection('appointments')}
                 >
-                  📅 Rendez-vous
+                  📅 Demandes RDV ({Array.isArray(rendezVousRequests) ? rendezVousRequests.length : 0})
                 </button>
                 
                 <button
@@ -631,7 +742,7 @@ const PorteurDashboard = () => {
                   }}
                   onClick={() => setActiveSection('issues')}
                 >
-                  🛠️ Problèmes utilisateurs
+                  🛠️ Support ({Array.isArray(userIssues) ? userIssues.length : 0})
                 </button>
               </nav>
             </div>
@@ -648,30 +759,28 @@ const PorteurDashboard = () => {
                 <div>
                   <p style={styles.adminName}>Ahmed Porteur</p>
                   <p style={styles.adminRole}>Porteur de Projets</p>
-                  <p style={styles.adminLastLogin}>Connecté depuis 10:15</p>
+                  <p style={styles.adminLastLogin}>
+                    Connecté: {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Access Rights */}
+            {/* Stats Summary */}
             <div style={styles.sidebarCard}>
-              <h3 style={styles.sidebarTitle}>🔐 Droits d'accès</h3>
-              <div style={styles.accessRights}>
-                <div style={styles.accessItem}>
-                  <span style={styles.accessIcon}>👁️</span>
-                  <span style={styles.accessLabel}>Consultation utilisateurs</span>
+              <h3 style={styles.sidebarTitle}>📈 Résumé</h3>
+              <div style={styles.summaryStats}>
+                <div style={styles.summaryItem}>
+                  <span style={styles.summaryNumber}>{Array.isArray(users) ? users.length : 0}</span>
+                  <span style={styles.summaryLabel}>Utilisateurs</span>
                 </div>
-                <div style={styles.accessItem}>
-                  <span style={styles.accessIcon}>👁️</span>
-                  <span style={styles.accessLabel}>Consultation projets</span>
+                <div style={styles.summaryItem}>
+                  <span style={styles.summaryNumber}>{Array.isArray(projects) ? projects.length : 0}</span>
+                  <span style={styles.summaryLabel}>Projets</span>
                 </div>
-                <div style={styles.accessItem}>
-                  <span style={styles.accessIcon}>✏️</span>
-                  <span style={styles.accessLabel}>Modification rendez-vous</span>
-                </div>
-                <div style={styles.accessItem}>
-                  <span style={styles.accessIcon}>🛠️</span>
-                  <span style={styles.accessLabel}>Gestion problèmes</span>
+                <div style={styles.summaryItem}>
+                  <span style={styles.summaryNumber}>{Array.isArray(rendezVousRequests) ? rendezVousRequests.length : 0}</span>
+                  <span style={styles.summaryLabel}>Demandes RDV</span>
                 </div>
               </div>
             </div>
@@ -820,26 +929,27 @@ const styles = {
     margin: '0',
     fontSize: '0.7rem'
   },
-  accessRights: {
+  summaryStats: {
     display: 'flex',
     flexDirection: 'column',
     gap: '0.75rem'
   },
-  accessItem: {
+  summaryItem: {
     display: 'flex',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: '0.5rem',
     padding: '0.5rem',
     backgroundColor: '#f8f9fa',
-    borderRadius: '6px',
-    border: '1px solid #e9ecef'
+    borderRadius: '6px'
   },
-  accessIcon: {
-    fontSize: '1rem'
+  summaryNumber: {
+    fontSize: '1.2rem',
+    fontWeight: 'bold',
+    color: '#8B4513'
   },
-  accessLabel: {
+  summaryLabel: {
     fontSize: '0.8rem',
-    color: '#333'
+    color: '#666'
   },
   mainContent: {
     backgroundColor: 'white',
@@ -967,14 +1077,18 @@ const styles = {
     color: '#1565c0',
     fontWeight: '500'
   },
-  addButton: {
-    backgroundColor: '#28a745',
-    color: 'white',
-    border: 'none',
-    padding: '0.75rem 1.5rem',
+  appointmentStats: {
+    display: 'flex',
+    gap: '1rem',
+    alignItems: 'center'
+  },
+  appointmentStat: {
+    fontSize: '0.9rem',
+    color: '#666',
+    padding: '0.5rem 1rem',
+    backgroundColor: '#f8f9fa',
     borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '0.9rem'
+    border: '1px solid #e9ecef'
   },
   filtersSection: {
     display: 'flex',
@@ -1147,7 +1261,7 @@ const styles = {
   },
   appointmentsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
     gap: '1.5rem'
   },
   appointmentCard: {
@@ -1195,7 +1309,7 @@ const styles = {
     cursor: 'pointer',
     fontSize: '0.8rem'
   },
-  editButton: {
+  contactButton: {
     backgroundColor: '#17a2b8',
     color: 'white',
     border: 'none',
@@ -1277,14 +1391,14 @@ const styles = {
     cursor: 'pointer',
     fontSize: '0.8rem'
   },
-  contactButton: {
-    backgroundColor: '#17a2b8',
-    color: 'white',
-    border: 'none',
-    padding: '0.5rem 0.75rem',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '0.8rem'
+  emptyState: {
+    gridColumn: '1 / -1',
+    textAlign: 'center',
+    padding: '3rem',
+    color: '#666',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '12px',
+    border: '2px dashed #dee2e6'
   },
   loadingContainer: {
     display: 'flex',

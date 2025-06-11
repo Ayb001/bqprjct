@@ -1041,8 +1041,6 @@ const ProjectCatalog = () => {
           <nav className="main-nav">
             <a href="/project_catalog" className="nav-link">Accueil</a>
             <a href="/article_page" className="nav-link active">Articles</a>
-            <a href="#" className="nav-link">À propos</a>
-            <a href="#" className="nav-link">Contact</a>
           </nav>
         </div>
       </header>

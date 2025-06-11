@@ -8,7 +8,7 @@ import ProjectCatalog from './pages/project_catalog'
 import ProjectDetailsPage from './pages/project_details_page'
 import ChatBot from './pages/chat_bot'
 import SubmitPage from './pages/submit_page'
-import ArticlesPage from './pages/article_page' 
+import ArticlesPage from './pages/article_page'
 import ProjectCatalogPorteur from './pages/project_ctalog_porteur'
 import PorteurDashboard from './pages/porteur_dashboard'
 import AdminDashboard from './pages/admin_dashboard'
@@ -32,80 +32,57 @@ function App() {
           <Route path="/terms-conditions" element={<TermsConditions />} />
           <Route path="/login" element={<Login />} />
           <Route path="/forgot_password" element={<ForgotPassword />} />
-          
+
           {/* Protected Routes */}
-          <Route 
-            path="/project_catalog" 
+          <Route
+            path="/project_catalog"
             element={
               <ProtectedRoute>
                 <ProjectCatalog />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/project_details_page" 
+          <Route
+            path="/project_details_page"
             element={
               <ProtectedRoute>
                 <ProjectDetailsPage />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/chat_bot" 
+          <Route
+            path="/chat_bot"
             element={
               <ProtectedRoute>
                 <ChatBot />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/submit_page" 
+          <Route
+            path="/submit_page"
             element={
               <ProtectedRoute>
                 <SubmitPage />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/article_page" 
+          <Route
+            path="/article_page"
             element={
               <ProtectedRoute>
                 <ArticlesPage />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/project_catalog_porteur" 
+          <Route
+            path="/project_catalog_porteur"
             element={
               <ProtectedRoute>
-                <ProjectCatalogPorteur/>
+                <ProjectCatalogPorteur />
               </ProtectedRoute>
-            } 
+            }
           />
-            <Route 
-            path="/porteur_dashboard" 
-            element={
-              <ProtectedRoute>
-                <PorteurDashboard/>
-              </ProtectedRoute>
-            } 
-          />
-            <Route 
-            path="/admin_dashboard" 
-            element={
-              <ProtectedRoute>
-                <AdminDashboard/>
-              </ProtectedRoute>
-            } 
-          />
-            <Route 
-            path="/form_page" 
-            element={
-              <ProtectedRoute>
-                <FormPage/>
-              </ProtectedRoute>
-            } 
-          />
+
         </Routes>
       </Router>
     </div>
